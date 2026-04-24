@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>数字捕捉手：奇偶与倍数 - 王老师的课堂笔记</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary: #f59e0b;
+            --success: #10b981;
+            --danger: #ef4444;
+            --bg: #f0f4f8;
+            --text: #1e293b;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            height: calc(100vh - 48px);
+            background: linear-gradient(to bottom, #dbeafe, #eff6ff);
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* UI Overlays */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.92);
+            z-index: 100;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .hidden { display: none !important; }
+
+        .stats-bar {
+            position: absolute;
+            top: 42px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.85);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            margin-top: 20px;
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            background: var(--primary-dark);
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        h1 { color: var(--primary); margin-bottom: 10px; font-size: 1.8rem; }
+        .rule-card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 15px 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            max-width: 80%;
+        }
+
+        .highlight { color: var(--secondary); font-weight: bold; }
+        .target-box { 
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        #achievement-popup {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 50px;
+            display: none;
+            animation: slideUp 0.5s ease-out;
+            z-index: 150;
+        }
+
+        @keyframes slideUp {
+            from { transform: translate(-50%, 50px); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
+
+        /* Control Panel */
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            z-index: 60;
+        }
+
+        .control-hint {
+            color: #64748b;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+    </style>
+
+<link rel="stylesheet" href="../assets/css/katex.min.css">
+<script src="../assets/js/katex.min.js"></script>
+<script src="../assets/js/auto-render.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const katexOptions = {
+        delimiters: [
+            {left: '\\[', right: '\\]', display: true},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false}
+        ],
+        throwOnError: false,
+        strict: false,
+        trust: true
+    };
+
+    let renderTimeout;
+    function safeRender() {
+        if (renderTimeout) clearTimeout(renderTimeout);
+        renderTimeout = setTimeout(() => {
+            renderMathInElement(document.body, katexOptions);
+        }, 100);
+    }
+
+    renderMathInElement(document.body, katexOptions);
+
+    const observer = new MutationObserver((mutations) => {
+        let shouldRender = false;
+        mutations.forEach((mutation) => {
+            if (mutation.target &&
+                mutation.target.className &&
+                typeof mutation.target.className === 'string' &&
+                mutation.target.className.includes('katex')) {
+                return;
+            }
+            shouldRender = true;
+        });
+
+        if (shouldRender) {
+            safeRender();
+        }
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+    });
+
+    setInterval(() => {
+        const text = document.body.innerText;
+        if (text.includes('\\(') || text.includes('$$')) {
+            safeRender();
+        }
+    }, 2000);
+});
+</script>
+</head>
+<body style="margin:0;margin-top:48px;">
+<!-- 统一导航栏 -->
+<nav style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fff;border-bottom:1px solid #e5e7eb;height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;">
+    <a href="../index.html" style="display:flex;align-items:center;gap:6px;text-decoration:none;color:#6b7280;font-size:13px;transition:color 0.2s;" onmouseover="this.style.color='#2563eb'" onmouseout="this.style.color='#6b7280'">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        返回首页
+    </a>
+    <span style="font-size:12px;color:#9ca3af;">王老师的课堂笔记</span>
+</nav>
+
+
+<div id="game-container">
+    <div class="stats-bar">
+        <div class="stat-box">得分: <span id="score-val">0</span></div>
+        <div class="stat-box">生命: <span id="lives-val">❤❤❤</span></div>
+        <div class="stat-box">关卡: <span id="level-val">1</span></div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="start-screen" class="overlay">
+        <h1>🎯 数字捕捉手</h1>
+        <div class="rule-card">
+            <p>控制篮子，捕捉符合规则的数字！</p>
+            <p>本次目标：</p>
+            <p><span id="target-display" class="target-box">2的倍数</span></p>
+            <p id="target-formula" style="font-size: 0.9rem; color: #64748b; margin-top:8px;"></p>
+        </div>
+        <p class="control-hint">滑动屏幕或移动鼠标来控制篮子</p>
+        <button class="btn" onclick="startGame()">开始挑战</button>
+    </div>
+
+    <div id="game-over-screen" class="overlay hidden">
+        <h1 id="over-title">游戏结束</h1>
+        <p>最终得分: <span id="final-score" class="highlight" style="font-size: 2rem;">0</span></p>
+        <p id="high-score-msg"></p>
+        <div id="achievements-list"></div>
+        <button class="btn" onclick="startGame()">再试一次</button>
+    </div>
+
+    <div id="achievement-popup">🏆 成就解锁!</div>
+</div>
+
+<script>
+/**
+ * Digital Catcher Game Logic
+ * 改造：随机倍数 + 统一颜色（不区分目标/非目标，提高难度）
+ */
+let canvas, ctx;
+let gameActive = false;
+let score = 0;
+let lives = 3;
+let level = 1;
+let combo = 0;
+let maxCombo = 0;
+let numbers = [];
+let particles = [];
+let basket = { x: 0, y: 0, w: 80, h: 60 };
+let lastSpawnTime = 0;
+let spawnRate = 1500; // ms
+let gameStartTime = 0;
+let caughtCount = 0;
+
+// 随机倍数目标
+let targetMultiples = []; // e.g. [3, 5] 表示3的倍数和5的倍数
+let targetDescriptions = []; // e.g. ["3的倍数", "5的倍数"]
+
+// 可选的倍数列表
+const AVAILABLE_MULTIPLES = [2, 3, 4, 5, 6, 7, 8, 9];
+
+function pickRandomTargets() {
+    // 随机选1~2个倍数
+    const count = Math.random() < 0.4 ? 1 : 2;
+    const shuffled = [...AVAILABLE_MULTIPLES].sort(() => Math.random() - 0.5);
+    targetMultiples = shuffled.slice(0, count);
+    targetDescriptions = targetMultiples.map(m => `${m}的倍数`);
+    
+    // 更新开始界面
+    const display = document.getElementById('target-display');
+    display.innerText = targetDescriptions.join(' 或 ');
+    
+    const formula = document.getElementById('target-formula');
+    const formulas = targetMultiples.map(m => `n % ${m} == 0`);
+    formula.innerText = formulas.join(' || ');
+}
+
+function isTargetNumber(val) {
+    return targetMultiples.some(m => val % m === 0);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    canvas = document.getElementById('gameCanvas');
+    ctx = canvas.getContext('2d');
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // 鼠标/触摸控制
+    const moveHandler = (e) => {
+        if (!gameActive) return;
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        basket.x = clientX - rect.left - basket.w / 2;
+        
+        if (basket.x < 0) basket.x = 0;
+        if (basket.x > canvas.width - basket.w) basket.x = canvas.width - basket.w;
+    };
+
+    canvas.addEventListener('mousemove', moveHandler);
+    canvas.addEventListener('touchstart', moveHandler, {passive: false});
+    canvas.addEventListener('touchmove', (e) => {
+        moveHandler(e);
+        e.preventDefault();
+    }, {passive: false});
+
+    basket.y = canvas.height - 100;
+    basket.x = canvas.width / 2 - basket.w / 2;
+
+    // 每次打开页面随机选择目标
+    pickRandomTargets();
+});
+
+function resizeCanvas() {
+    const container = document.getElementById('game-container');
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+    basket.y = canvas.height - 100;
+}
+
+window.startGame = function() {
+    document.getElementById('start-screen').classList.add('hidden');
+    document.getElementById('game-over-screen').classList.add('hidden');
+    
+    // 每次开始游戏重新随机选择目标
+    pickRandomTargets();
+    
+    // 重置状态
+    gameActive = true;
+    score = 0;
+    lives = 3;
+    level = 1;
+    combo = 0;
+    numbers = [];
+    particles = [];
+    spawnRate = 1800;
+    caughtCount = 0;
+    gameStartTime = Date.now();
+    
+    updateUI();
+    requestAnimationFrame(gameLoop);
+};
+
+function updateUI() {
+    document.getElementById('score-val').innerText = score;
+    document.getElementById('lives-val').innerText = '❤'.repeat(lives);
+    document.getElementById('level-val').innerText = level;
+}
+
+function spawnNumber() {
+    const now = Date.now();
+    if (now - lastSpawnTime < spawnRate) return;
+
+    const timeInGame = (now - gameStartTime) / 1000;
+    let val;
+    if (timeInGame < 4) {
+        // 开局优先生成目标数
+        const targets = [];
+        for (let m of targetMultiples) {
+            for (let k = 1; k <= 5; k++) targets.push(m * k);
+        }
+        // 也会混入一些非目标数
+        for (let i = 1; i <= 10; i++) {
+            if (!isTargetNumber(i)) targets.push(i);
+        }
+        val = targets[Math.floor(Math.random() * targets.length)];
+    } else {
+        val = Math.floor(Math.random() * (15 + level * 5)) + 1;
+    }
+
+    const isTarget = isTargetNumber(val);
+    
+    numbers.push({
+        x: Math.random() * (canvas.width - 40) + 20,
+        y: -30,
+        val: val,
+        isTarget: isTarget,
+        speed: 2 + Math.random() * (level * 0.5),
+        radius: 20
+    });
+
+    lastSpawnTime = now;
+    spawnRate = Math.max(600, 1800 - (level * 150));
+}
+
+function createParticles(x, y, color) {
+    for (let i = 0; i < 8; i++) {
+        particles.push({
+            x: x,
+            y: y,
+            vx: (Math.random() - 0.5) * 6,
+            vy: (Math.random() - 0.5) * 6,
+            life: 1.0,
+            color: color
+        });
+    }
+}
+
+function gameLoop() {
+    if (!gameActive) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 顶部目标提示
+    ctx.fillStyle = 'rgba(37, 99, 235, 0.1)';
+    ctx.fillRect(0, 0, canvas.width, 36);
+    ctx.fillStyle = '#2563eb';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🎯 目标：' + targetDescriptions.join(' 或 '), canvas.width / 2, 18);
+
+    // 更新粒子
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.03;
+        if (p.life <= 0) {
+            particles.splice(i, 1);
+            continue;
+        }
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1.0;
+
+    // 画篮子
+    ctx.fillStyle = '#1e293b';
+    roundRect(ctx, basket.x, basket.y, basket.w, basket.h, 10, true);
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(basket.x - 5, basket.y, basket.w + 10, 10);
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 2;
+    for(let i=1; i<4; i++) {
+        ctx.beginPath();
+        ctx.moveTo(basket.x + (basket.w/4)*i, basket.y + 10);
+        ctx.lineTo(basket.x + (basket.w/4)*i, basket.y + basket.h);
+        ctx.stroke();
+    }
+
+    // 更新和绘制数字
+    spawnNumber();
+    for (let i = numbers.length - 1; i >= 0; i--) {
+        const n = numbers[i];
+        n.y += n.speed;
+
+        // 碰撞检测
+        if (n.y + n.radius > basket.y && 
+            n.y - n.radius < basket.y + basket.h &&
+            n.x + n.radius > basket.x &&
+            n.x - n.radius < basket.x + basket.w) {
+            
+            if (n.isTarget) {
+                score += 10;
+                combo++;
+                caughtCount++;
+                if (combo > maxCombo) maxCombo = combo;
+                if (combo > 5) score += 5;
+                createParticles(n.x, n.y, '#10b981');
+                
+                if (caughtCount > 0 && caughtCount % 5 === 0) {
+                    level++;
+                    showPopup(`升级！关卡 ${level}`);
+                }
+            } else {
+                lives--;
+                combo = 0;
+                createParticles(n.x, n.y, '#ef4444');
+                shakeScreen();
+            }
+            updateUI();
+            numbers.splice(i, 1);
+            if (lives <= 0) endGame();
+            continue;
+        }
+
+        // 漏掉目标检测
+        if (n.y > canvas.height) {
+            if (n.isTarget) {
+                lives--;
+                combo = 0;
+                updateUI();
+                shakeScreen();
+                if (lives <= 0) endGame();
+            }
+            numbers.splice(i, 1);
+            continue;
+        }
+
+        // 绘制数字 - 统一颜色（不区分目标/非目标，提高难度）
+        ctx.beginPath();
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = 'rgba(37, 99, 235, 0.15)';
+        ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // 白色圆圈内统一用深色数字
+        ctx.fillStyle = '#1e293b';
+        ctx.font = 'bold 18px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(n.val, n.x, n.y);
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+function endGame() {
+    gameActive = false;
+    const overScreen = document.getElementById('game-over-screen');
+    const finalScoreEl = document.getElementById('final-score');
+    const highMsg = document.getElementById('high-score-msg');
+    
+    overScreen.classList.remove('hidden');
+    finalScoreEl.innerText = score;
+
+    let highScore = localStorage.getItem('math_catcher_highscore') || 0;
+    if (score > highScore) {
+        localStorage.setItem('math_catcher_highscore', score);
+        highMsg.innerText = "✨ 新纪录！ ✨";
+    } else {
+        highMsg.innerText = `历史最高: ${highScore}`;
+    }
+
+    let achieveHtml = "";
+    if (score >= 100) achieveHtml += "<div>🏅 数学达人 (得分100+)</div>";
+    if (maxCombo >= 10) achieveHtml += "<div>🔥 连击之王 (连击10+)</div>";
+    if (level >= 5) achieveHtml += "<div>🚀 进阶学者 (到达第5关)</div>";
+    document.getElementById('achievements-list').innerHTML = achieveHtml;
+}
+
+function showPopup(text) {
+    const p = document.getElementById('achievement-popup');
+    p.innerText = text;
+    p.style.display = 'block';
+    setTimeout(() => { p.style.display = 'none'; }, 2000);
+}
+
+function shakeScreen() {
+    const container = document.getElementById('game-container');
+    container.style.animation = 'shake 0.3s cubic-bezier(.36,.07,.19,.97) both';
+    setTimeout(() => container.style.animation = '', 300);
+}
+
+function roundRect(ctx, x, y, width, height, radius, fill) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+    if (fill) ctx.fill();
+}
+
+const style = document.createElement('style');
+style.innerHTML = `
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+`;
+document.head.appendChild(style);
+</script>
+
+</body>
+</html>

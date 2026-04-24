@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>向上取整逻辑模拟器 - 王老师的课堂笔记</title>
+    <script src="../assets/js/tailwind.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --bg: #f8fafc;
+        }
+        body {
+            background-color: var(--bg);
+            touch-action: manipulation;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden;
+        }
+        .control-panel {
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            z-index: 10;
+        }
+        canvas {
+            display: block;
+            touch-action: none;
+            background-color: #ffffff;
+        }
+        input[type=range] {
+            height: 38px;
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 8px;
+            cursor: pointer;
+            background: #e2e8f0;
+            border-radius: 4px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -8px;
+        }
+        .btn-active {
+            transform: translateY(1px);
+        }
+        @keyframes pulse-highlight { 0%, 100% { outline-color: rgba(37, 99, 235, 0.8); } 50% { outline-color: rgba(37, 99, 235, 0.4); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .math-box {
+            font-family: 'Courier New', Courier, monospace;
+            background: #1e293b;
+            color: #38bdf8;
+            padding: 10px;
+            border-radius: 6px;
+        }
+    </style>
+
+<link rel="stylesheet" href="../assets/css/katex.min.css">
+<script src="../assets/js/katex.min.js"></script>
+<script src="../assets/js/auto-render.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const katexOptions = {
+        delimiters: [
+            {left: '\\[', right: '\\]', display: true},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false}
+        ],
+        throwOnError: false,
+        strict: false,
+        trust: true
+    };
+
+    let renderTimeout;
+    function safeRender() {
+        if (renderTimeout) clearTimeout(renderTimeout);
+        renderTimeout = setTimeout(() => {
+            renderMathInElement(document.body, katexOptions);
+        }, 100);
+    }
+
+    renderMathInElement(document.body, katexOptions);
+
+    const observer = new MutationObserver((mutations) => {
+        let shouldRender = false;
+        mutations.forEach((mutation) => {
+            if (mutation.target &&
+                mutation.target.className &&
+                typeof mutation.target.className === 'string' &&
+                mutation.target.className.includes('katex')) {
+                return;
+            }
+            shouldRender = true;
+        });
+
+        if (shouldRender) {
+            safeRender();
+        }
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+    });
+
+    setInterval(() => {
+        const text = document.body.innerText;
+        if (text.includes('\\(') || text.includes('$$')) {
+            safeRender();
+        }
+    }, 2000);
+});
+</script>
+</head>
+<body class="flex flex-col md:flex-row overflow-hidden" style="margin-top:48px;height:calc(100vh - 48px);">
+<!-- 统一导航栏 -->
+<nav style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fff;border-bottom:1px solid #e5e7eb;height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;">
+    <a href="../index.html" style="display:flex;align-items:center;gap:6px;text-decoration:none;color:#6b7280;font-size:13px;transition:color 0.2s;" onmouseover="this.style.color='#2563eb'" onmouseout="this.style.color='#6b7280'">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        返回首页
+    </a>
+    <span style="font-size:12px;color:#9ca3af;">王老师的课堂笔记</span>
+</nav>
+
+
+    <script type="application/json" id="widget-config">
+    {
+        "type": "simulation",
+        "concept": "ceiling_division_logic",
+        "description": "模拟向上取整逻辑，通过物品装箱展示 (total / size) + (remainder ? 1 : 0) 的计算过程。",
+        "variables": [
+            { "name": "itemCount", "label": "物品总数", "min": 1, "max": 40, "default": 13, "unit": "个" },
+            { "name": "boxCapacity", "label": "箱子容量", "min": 1, "max": 10, "default": 5, "unit": "个/箱" }
+        ],
+        "presets": [
+            { "name": "恰好装满", "variables": { "itemCount": 20, "boxCapacity": 5 } },
+            { "name": "多出一个", "variables": { "itemCount": 21, "boxCapacity": 5 } },
+            { "name": "极大容量", "variables": { "itemCount": 15, "boxCapacity": 10 } }
+        ]
+    }
+    </script>
+
+    <!-- Sidebar / Controls -->
+    <div id="controls" class="w-full md:w-80 flex-shrink-0 bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-col max-h-[45vh] md:max-h-screen overflow-y-auto p-4">
+        <h1 class="text-xl font-bold text-slate-800 mb-2">向上取整逻辑</h1>
+        <p class="text-sm text-slate-500 mb-6">探究“不满一单位补一”在算法中的体现。</p>
+
+        <div class="space-y-6">
+            <div>
+                <div class="flex justify-between mb-2">
+                    <label class="text-sm font-medium text-slate-700">物品总数 (Total)</label>
+                    <span id="itemCount-display" class="text-sm font-bold text-blue-600">13 个</span>
+                </div>
+                <input type="range" id="itemCount-slider" data-var="itemCount" min="1" max="40" value="13" class="w-full">
+            </div>
+
+            <div>
+                <div class="flex justify-between mb-2">
+                    <label class="text-sm font-medium text-slate-700">箱子容量 (Size)</label>
+                    <span id="boxCapacity-display" class="text-sm font-bold text-blue-600">5 个</span>
+                </div>
+                <input type="range" id="boxCapacity-slider" data-var="boxCapacity" min="1" max="10" value="5" class="w-full">
+            </div>
+
+            <div class="math-box text-xs leading-relaxed">
+                <div>// 核心逻辑计算：</div>
+                <div id="math-display">
+                    count = 13 / 5 + (13 % 5 != 0 ? 1 : 0) <br>
+                    count = 2 + 1 = <span class="text-yellow-400">3</span>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-2 pt-2">
+                <button id="start-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all active:scale-95">
+                    启动模拟
+                </button>
+                <button id="reset-btn" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 rounded-xl transition-all">
+                    重置
+                </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 pb-4">
+                <button onclick="applyPreset(20, 5)" class="text-xs py-2 px-1 bg-slate-50 border border-slate-200 rounded hover:bg-slate-100">恰好装满 (20/5)</button>
+                <button onclick="applyPreset(21, 5)" class="text-xs py-2 px-1 bg-slate-50 border border-slate-200 rounded hover:bg-slate-100">多出一个 (21/5)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Canvas Area -->
+    <div class="flex-1 relative bg-slate-50 flex flex-col">
+        <div id="status-badge" class="absolute top-4 left-4 px-3 py-1 rounded-full bg-slate-800 text-white text-xs font-bold uppercase tracking-wider z-10">
+            等待启动
+        </div>
+        
+        <div id="result-overlay" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none opacity-0 transition-opacity duration-500 z-20">
+            <h2 class="text-4xl font-black text-slate-800 mb-2">计算完成!</h2>
+            <p id="result-text" class="text-xl text-blue-600 font-bold bg-white/80 backdrop-blur px-4 py-2 rounded-lg shadow-xl border-2 border-blue-100"></p>
+        </div>
+
+        <canvas id="simCanvas" class="w-full h-full"></canvas>
+    </div>
+
+    <script>
+        // --- State Management ---
+        const config = JSON.parse(document.getElementById('widget-config').textContent);
+        let state = {
+            running: false,
+            paused: false,
+            ended: false,
+            itemCount: 13,
+            boxCapacity: 5,
+            progress: 0, // 0 to itemCount
+            animationItems: [], // Items currently flying
+            packedItems: [], // Items already in boxes
+            lastBoxHighlight: false
+        };
+
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('start-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const statusBadge = document.getElementById('status-badge');
+        const resultOverlay = document.getElementById('result-overlay');
+        const resultText = document.getElementById('result-text');
+
+        // --- Initialization ---
+        function init() {
+            window.addEventListener('resize', resize);
+            resize();
+
+            // Sliders
+            document.querySelectorAll('input[type=range]').forEach(input => {
+                input.addEventListener('input', (e) => {
+                    const varName = e.target.dataset.var;
+                    const val = parseInt(e.target.value);
+                    state[varName] = val;
+                    document.getElementById(`${varName}-display`).textContent = `${val} ${varName === 'itemCount' ? '个' : '个/箱'}`;
+                    updateMath();
+                    resetSimulation();
+                });
+            });
+
+            startBtn.addEventListener('click', toggleSimulation);
+            resetBtn.addEventListener('click', resetSimulation);
+
+            updateMath();
+            requestAnimationFrame(render);
+        }
+
+        function resize() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.height * window.devicePixelRatio;
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+
+        function updateMath() {
+            const quotient = Math.floor(state.itemCount / state.boxCapacity);
+            const remainder = state.itemCount % state.boxCapacity;
+            const extra = remainder > 0 ? 1 : 0;
+            const total = quotient + extra;
+            
+            document.getElementById('math-display').innerHTML = `
+                count = ${state.itemCount} / ${state.boxCapacity} + (${state.itemCount} % ${state.boxCapacity} != 0 ? 1 : 0) <br>
+                count = ${quotient} + ${extra} = <span class="text-yellow-400 font-bold">${total}</span>
+            `;
+        }
+
+        function applyPreset(count, cap) {
+            state.itemCount = count;
+            state.boxCapacity = cap;
+            
+            const countSlider = document.getElementById('itemCount-slider');
+            const capSlider = document.getElementById('boxCapacity-slider');
+            countSlider.value = count;
+            capSlider.value = cap;
+            
+            // Dispatch events to update UI
+            countSlider.dispatchEvent(new Event('input'));
+            capSlider.dispatchEvent(new Event('input'));
+            
+            resetSimulation();
+        }
+
+        // --- Simulation Logic ---
+        function toggleSimulation() {
+            if (state.ended) {
+                resetSimulation();
+                startSimulation();
+            } else if (state.running) {
+                pauseSimulation();
+            } else {
+                startSimulation();
+            }
+        }
+
+        function startSimulation() {
+            state.running = true;
+            state.paused = false;
+            startBtn.textContent = '暂停模拟';
+            startBtn.classList.add('bg-amber-500');
+            startBtn.classList.remove('bg-blue-600');
+            statusBadge.textContent = '运行中';
+            statusBadge.classList.replace('bg-slate-800', 'bg-green-600');
+        }
+
+        function pauseSimulation() {
+            state.running = false;
+            state.paused = true;
+            startBtn.textContent = '继续模拟';
+            startBtn.classList.remove('bg-amber-500');
+            startBtn.classList.add('bg-blue-600');
+            statusBadge.textContent = '已暂停';
+            statusBadge.classList.replace('bg-green-600', 'bg-amber-500');
+        }
+
+        function resetSimulation() {
+            state.running = false;
+            state.paused = false;
+            state.ended = false;
+            state.progress = 0;
+            state.animationItems = [];
+            state.packedItems = [];
+            state.lastBoxHighlight = false;
+            
+            startBtn.textContent = '启动模拟';
+            startBtn.classList.remove('bg-amber-500');
+            startBtn.classList.add('bg-blue-600');
+            
+            statusBadge.textContent = '等待启动';
+            statusBadge.className = 'absolute top-4 left-4 px-3 py-1 rounded-full bg-slate-800 text-white text-xs font-bold uppercase tracking-wider z-10';
+            
+            resultOverlay.style.opacity = '0';
+        }
+
+        function completeSimulation() {
+            state.running = false;
+            state.ended = true;
+            startBtn.textContent = '重新开始';
+            startBtn.classList.remove('bg-amber-500');
+            startBtn.classList.add('bg-blue-600');
+            statusBadge.textContent = '已结束';
+            statusBadge.classList.replace('bg-green-600', 'bg-slate-800');
+
+            const total = Math.ceil(state.itemCount / state.boxCapacity);
+            resultText.textContent = `共需要 ${total} 个箱子`;
+            resultOverlay.style.opacity = '1';
+        }
+
+        // --- Rendering ---
+        let lastTime = 0;
+        let spawnTimer = 0;
+
+        function render(timestamp) {
+            const deltaTime = timestamp - lastTime;
+            lastTime = timestamp;
+
+            const w = canvas.width / window.devicePixelRatio;
+            const h = canvas.height / window.devicePixelRatio;
+            
+            ctx.clearRect(0, 0, w, h);
+
+            // Draw Source Area
+            const sourceX = 60;
+            const sourceY = h - 100;
+            ctx.fillStyle = '#f1f5f9';
+            ctx.beginPath();
+            ctx.roundRect(sourceX - 40, sourceY - 40, 80, 80, 10);
+            ctx.fill();
+            ctx.fillStyle = '#64748b';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('物品源', sourceX, sourceY + 55);
+
+            // Spawn Logic
+            if (state.running && state.progress < state.itemCount) {
+                spawnTimer += deltaTime;
+                if (spawnTimer > 300) { // New item every 300ms
+                    spawnItem(sourceX, sourceY);
+                    state.progress++;
+                    spawnTimer = 0;
+                }
+            }
+
+            // Draw Box Targets
+            const boxW = 80;
+            const boxH = 100;
+            const gap = 20;
+            const boxesPerRow = Math.floor((w - 200) / (boxW + gap));
+            const startX = 180;
+            const startY = 80;
+
+            const totalBoxesNeeded = Math.ceil(state.itemCount / state.boxCapacity);
+            const fullBoxes = Math.floor(state.itemCount / state.boxCapacity);
+            const hasRemainder = state.itemCount % state.boxCapacity !== 0;
+
+            for (let i = 0; i < totalBoxesNeeded; i++) {
+                const col = i % boxesPerRow;
+                const row = Math.floor(i / boxesPerRow);
+                const bx = startX + col * (boxW + gap);
+                const by = startY + row * (boxH + gap + 30);
+
+                // Box Body
+                const isLast = i === totalBoxesNeeded - 1;
+                const isPartial = isLast && hasRemainder;
+                
+                ctx.strokeStyle = isPartial ? '#2563eb' : '#cbd5e1';
+                ctx.lineWidth = isPartial ? 3 : 2;
+                ctx.setLineDash(isPartial ? [5, 3] : []);
+                
+                ctx.strokeRect(bx, by, boxW, boxH);
+                ctx.setLineDash([]);
+
+                // Box Label
+                ctx.fillStyle = isPartial ? '#2563eb' : '#64748b';
+                ctx.font = 'bold 12px monospace';
+                ctx.fillText(`箱子 #${i+1}`, bx + boxW/2, by - 10);
+
+                if (isPartial) {
+                    ctx.fillStyle = '#2563eb';
+                    ctx.font = '10px sans-serif';
+                    ctx.fillText('(不满一箱补1)', bx + boxW/2, by + boxH + 15);
+                }
+
+                // Draw static items in this box
+                const itemsInThisBox = state.packedItems.filter(p => p.boxIndex === i);
+                itemsInThisBox.forEach((p, idx) => {
+                    drawItem(bx + 15 + (idx % 3) * 25, by + boxH - 20 - Math.floor(idx / 3) * 25, 10, '#2563eb');
+                });
+            }
+
+            // Update & Draw flying items
+            for (let i = state.animationItems.length - 1; i >= 0; i--) {
+                const item = state.animationItems[i];
+                if (state.running) {
+                    item.t += 0.04;
+                }
+
+                if (item.t >= 1) {
+                    // Item arrived
+                    state.packedItems.push({ boxIndex: item.boxIndex });
+                    state.animationItems.splice(i, 1);
+                    
+                    if (state.progress === state.itemCount && state.animationItems.length === 0) {
+                        completeSimulation();
+                    }
+                } else {
+                    // Quadratic Bezier for a nice arc
+                    const cx = (item.sx + item.tx) / 2;
+                    const cy = Math.min(item.sy, item.ty) - 100;
+                    
+                    const x = (1 - item.t) * (1 - item.t) * item.sx + 2 * (1 - item.t) * item.t * cx + item.t * item.t * item.tx;
+                    const y = (1 - item.t) * (1 - item.t) * item.sy + 2 * (1 - item.t) * item.t * cy + item.t * item.t * item.ty;
+                    
+                    drawItem(x, y, 12, '#2563eb', true);
+                }
+            }
+
+            requestAnimationFrame(render);
+        }
+
+        function spawnItem(sx, sy) {
+            const itemIdx = state.progress;
+            const boxIndex = Math.floor(itemIdx / state.boxCapacity);
+            const inBoxIdx = itemIdx % state.boxCapacity;
+
+            // Calculate target pos in box
+            const w = canvas.width / window.devicePixelRatio;
+            const boxW = 80;
+            const boxH = 100;
+            const gap = 20;
+            const boxesPerRow = Math.floor((w - 200) / (boxW + gap));
+            const startX = 180;
+            const startY = 80;
+
+            const col = boxIndex % boxesPerRow;
+            const row = Math.floor(boxIndex / boxesPerRow);
+            const bx = startX + col * (boxW + gap);
+            const by = startY + row * (boxH + gap + 30);
+
+            const tx = bx + 15 + (inBoxIdx % 3) * 25;
+            const ty = by + boxH - 20 - Math.floor(inBoxIdx / 3) * 25;
+
+            state.animationItems.push({ sx, sy, tx, ty, t: 0, boxIndex });
+        }
+
+        function drawItem(x, y, radius, color, shadow = false) {
+            if (shadow) {
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = 'rgba(37, 99, 235, 0.3)';
+                ctx.shadowOffsetY = 4;
+            }
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Gloss effect
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.beginPath();
+            ctx.arc(x - radius/3, y - radius/3, radius/3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetY = 0;
+        }
+
+        // --- Teacher Action Listeners ---
+        window.addEventListener('message', function(event) {
+            const { type, target, state: newState, content } = event.data;
+
+            switch (type) {
+                case 'SET_WIDGET_STATE':
+                    if (newState) {
+                        Object.entries(newState).forEach(([key, value]) => {
+                            const slider = document.getElementById(key + '-slider') || document.querySelector('[data-var="' + key + '"]');
+                            if (slider) {
+                                slider.value = value;
+                                slider.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                        });
+                    }
+                    break;
+
+                case 'HIGHLIGHT_ELEMENT':
+                    const highlightEl = document.querySelector(target);
+                    if (highlightEl) {
+                        highlightEl.style.outline = '3px solid rgba(37, 99, 235, 0.8)';
+                        highlightEl.style.outlineOffset = '4px';
+                        highlightEl.style.animation = 'pulse-highlight 2s infinite';
+                        setTimeout(() => {
+                            highlightEl.style.outline = '';
+                            highlightEl.style.animation = '';
+                        }, 3000);
+                    }
+                    break;
+
+                case 'ANNOTATE_ELEMENT':
+                    const annotateEl = document.querySelector(target);
+                    if (annotateEl && content) {
+                        const rect = annotateEl.getBoundingClientRect();
+                        const tooltip = document.createElement('div');
+                        tooltip.className = 'teacher-annotation';
+                        tooltip.style.cssText = 'position:fixed; top:' + (rect.top - 40) + 'px; left:' + rect.left + 'px; background:rgba(37, 99, 235,0.95); color:white; padding:8px 12px; border-radius:8px; font-size:14px; z-index:1000; animation:fadeIn 0.3s;';
+                        tooltip.textContent = content;
+                        document.body.appendChild(tooltip);
+                        setTimeout(() => tooltip.remove(), 4000);
+                    }
+                    break;
+            }
+        });
+
+        // Start everything
+        init();
+
+        // Keyboard Shortcuts
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                toggleSimulation();
+            }
+            if (e.code === 'KeyR') {
+                resetSimulation();
+            }
+        });
+    </script>
+
+</body>
+</html>

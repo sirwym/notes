@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>cin 数据传送带 - 王老师的课堂笔记</title>
+    <script src="../assets/js/tailwind.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --bg-dark: #1e293b;
+        }
+        
+        body {
+            background-color: #f8fafc;
+            touch-action: manipulation;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        .control-panel {
+            background: white;
+            box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.1);
+            z-index: 50;
+        }
+
+        canvas {
+            touch-action: none;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .slider-thumb::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            background: var(--primary);
+            cursor: pointer;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .slider-thumb::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            background: var(--primary);
+            cursor: pointer;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .status-badge {
+            transition: all 0.3s ease;
+        }
+
+        @keyframes pulse-highlight { 
+            0%, 100% { outline-color: rgba(139, 92, 246, 0.8); } 
+            50% { outline-color: rgba(139, 92, 246, 0.4); } 
+        }
+
+        @keyframes fadeIn { 
+            from { opacity: 0; transform: translateY(10px); } 
+            to { opacity: 1; transform: translateY(0); } 
+        }
+
+        .teacher-annotation {
+            pointer-events: none;
+        }
+    </style>
+
+<link rel="stylesheet" href="../assets/css/katex.min.css">
+<script src="../assets/js/katex.min.js"></script>
+<script src="../assets/js/auto-render.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const katexOptions = {
+        delimiters: [
+            {left: '\\[', right: '\\]', display: true},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false}
+        ],
+        throwOnError: false,
+        strict: false,
+        trust: true
+    };
+
+    let renderTimeout;
+    function safeRender() {
+        if (renderTimeout) clearTimeout(renderTimeout);
+        renderTimeout = setTimeout(() => {
+            renderMathInElement(document.body, katexOptions);
+        }, 100);
+    }
+
+    renderMathInElement(document.body, katexOptions);
+
+    const observer = new MutationObserver((mutations) => {
+        let shouldRender = false;
+        mutations.forEach((mutation) => {
+            if (mutation.target &&
+                mutation.target.className &&
+                typeof mutation.target.className === 'string' &&
+                mutation.target.className.includes('katex')) {
+                return;
+            }
+            shouldRender = true;
+        });
+
+        if (shouldRender) {
+            safeRender();
+        }
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+    });
+
+    setInterval(() => {
+        const text = document.body.innerText;
+        if (text.includes('\\(') || text.includes('$$')) {
+            safeRender();
+        }
+    }, 2000);
+});
+</script>
+</head>
+<body class="flex flex-col h-screen overflow-hidden md:flex-row" style="margin-top:48px;height:calc(100vh - 48px);">
+
+<!-- 统一导航栏 -->
+<nav style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fff;border-bottom:1px solid #e5e7eb;height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;">
+    <a href="../index.html" style="display:flex;align-items:center;gap:6px;text-decoration:none;color:#6b7280;font-size:13px;transition:color 0.2s;" onmouseover="this.style.color='#2563eb'" onmouseout="this.style.color='#6b7280'">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        返回首页
+    </a>
+    <span style="font-size:12px;color:#9ca3af;">王老师的课堂笔记</span>
+</nav>
+
+    <!-- Widget Config -->
+    <script type="application/json" id="widget-config">
+    {
+      "type": "simulation",
+      "concept": "standard_input_stream",
+      "description": "模拟 C++ 中 cin 输入流如何将数据从键盘传递到变量的过程",
+      "variables": [
+        { "name": "input_number", "label": "输入数值", "min": 0, "max": 999, "default": 42, "unit": "" },
+        { "name": "variable_name", "label": "变量名称", "type": "text", "default": "age" },
+        { "name": "flow_speed", "label": "传送速度", "min": 1, "max": 10, "default": 5, "unit": "x" }
+      ],
+      "presets": [
+        { "name": "快速存入", "variables": { "input_number": 100, "flow_speed": 8, "variable_name": "score" } },
+        { "name": "慢速观察", "variables": { "input_number": 7, "flow_speed": 2, "variable_name": "count" } }
+      ]
+    }
+    </script>
+
+    <!-- Controls Panel -->
+    <div id="controls" class="w-full md:w-80 flex-shrink-0 control-panel overflow-y-auto border-r border-slate-200 order-2 md:order-1 flex flex-col">
+        <div class="p-4 space-y-6">
+            <h1 class="text-xl font-bold text-slate-800 border-b pb-2">cin 输入流模拟</h1>
+            
+            <!-- Inputs -->
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 mb-1">变量名 (Variable Name)</label>
+                    <input type="text" id="variable_name-input" maxlength="10" 
+                           class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" 
+                           value="age" placeholder="例如: age">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 mb-1 flex justify-between">
+                        <span>输入数值: <span id="input_number-display" class="font-mono text-brand-600">42</span></span>
+                    </label>
+                    <input type="range" id="input_number-slider" min="0" max="999" value="42" 
+                           class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer slider-thumb">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 mb-1 flex justify-between">
+                        <span>传送速度: <span id="flow_speed-display" class="font-mono text-brand-600">5</span></span>
+                    </label>
+                    <input type="range" id="flow_speed-slider" min="1" max="10" value="5" 
+                           class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer slider-thumb">
+                </div>
+            </div>
+
+            <!-- Presets -->
+            <div class="pt-2">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">预设场景</p>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="applyPreset(0)" class="text-xs py-2 bg-slate-100 hover:bg-slate-200 rounded transition">快速存入</button>
+                    <button onclick="applyPreset(1)" class="text-xs py-2 bg-slate-100 hover:bg-slate-200 rounded transition">慢速观察</button>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-2 pt-2">
+                <button id="main-btn" onclick="handleMainAction()" 
+                        class="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-lg shadow-lg active:transform active:scale-95 transition-all">
+                    启动
+                </button>
+                <button id="reset-btn" onclick="resetSimulation()" 
+                        class="px-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 rounded-lg transition-all">
+                    重置
+                </button>
+            </div>
+            
+            <div class="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                <code id="code-preview" class="text-sm font-mono text-blue-800">cin >> age;</code>
+            </div>
+        </div>
+        
+        <div class="mt-auto p-4 text-xs text-slate-400 text-center">
+            点击启动观察数据如何流入变量
+        </div>
+    </div>
+
+    <!-- Canvas Area -->
+    <div class="flex-1 relative bg-slate-900 order-1 md:order-2 overflow-hidden">
+        <canvas id="simCanvas"></canvas>
+        
+        <!-- HUD Overlay -->
+        <div class="absolute top-4 left-4 pointer-events-none">
+            <div id="status-badge" class="px-3 py-1 rounded-full bg-slate-800 text-slate-300 text-xs font-bold border border-slate-700 flex items-center gap-2">
+                <div id="status-dot" class="w-2 h-2 rounded-full bg-slate-500"></div>
+                <span id="status-text">就绪</span>
+            </div>
+        </div>
+
+        <div id="success-msg" class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-500">
+            <div class="bg-emerald-500 text-white px-6 py-3 rounded-xl shadow-2xl font-bold text-xl flex items-center gap-3">
+                <span>赋值成功!</span>
+                <span class="text-2xl">✓</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const mainBtn = document.getElementById('main-btn');
+        const variableInput = document.getElementById('variable_name-input');
+        const numSlider = document.getElementById('input_number-slider');
+        const numDisplay = document.getElementById('input_number-display');
+        const speedSlider = document.getElementById('flow_speed-slider');
+        const speedDisplay = document.getElementById('flow_speed-display');
+        const codePreview = document.getElementById('code-preview');
+        const successMsg = document.getElementById('success-msg');
+
+        let state = {
+            running: false,
+            paused: false,
+            ended: false,
+            progress: 0, // 0 to 1
+            variableName: 'age',
+            inputValue: 42,
+            speed: 5,
+            boxValue: null,
+            particles: []
+        };
+
+        // Layout Constants
+        let layout = {
+            width: 0,
+            height: 0,
+            centerX: 0,
+            centerY: 0,
+            sourceX: 0,
+            sourceY: 0,
+            sinkX: 0,
+            sinkY: 0,
+            funnelTop: 0,
+            funnelBottom: 0
+        };
+
+        function resize() {
+            canvas.width = canvas.clientWidth * window.devicePixelRatio;
+            canvas.height = canvas.clientHeight * window.devicePixelRatio;
+            
+            layout.width = canvas.width;
+            layout.height = canvas.height;
+            layout.centerX = layout.width / 2;
+            layout.centerY = layout.height / 2;
+            
+            // Positions
+            layout.sourceX = layout.width * 0.15;
+            layout.sourceY = layout.height * 0.3;
+            layout.sinkX = layout.width * 0.85;
+            layout.sinkY = layout.height * 0.7;
+            
+            layout.funnelTop = layout.height * 0.2;
+            layout.funnelBottom = layout.height * 0.8;
+            
+            draw();
+        }
+
+        window.addEventListener('resize', resize);
+
+        // Control Panel Listeners
+        variableInput.addEventListener('input', (e) => {
+            state.variableName = e.target.value || 'x';
+            updateUI();
+            draw();
+        });
+
+        numSlider.addEventListener('input', (e) => {
+            state.inputValue = parseInt(e.target.value);
+            numDisplay.textContent = state.inputValue;
+            draw();
+        });
+
+        speedSlider.addEventListener('input', (e) => {
+            state.speed = parseInt(e.target.value);
+            speedDisplay.textContent = state.speed;
+        });
+
+        function updateUI() {
+            codePreview.textContent = `cin >> ${state.variableName};`;
+            
+            if (state.ended) {
+                mainBtn.textContent = '重新开始';
+                mainBtn.className = mainBtn.className.replace('bg-brand-600', 'bg-blue-600');
+                document.getElementById('status-text').textContent = '完成';
+                document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-emerald-500';
+            } else if (state.running) {
+                mainBtn.textContent = '暂停';
+                mainBtn.className = mainBtn.className.replace('bg-brand-600', 'bg-amber-500').replace('bg-blue-600', 'bg-amber-500');
+                document.getElementById('status-text').textContent = '传送中...';
+                document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-blue-500 animate-pulse';
+            } else {
+                mainBtn.textContent = '启动';
+                mainBtn.className = mainBtn.className.replace('bg-amber-500', 'bg-brand-600').replace('bg-blue-600', 'bg-brand-600');
+                document.getElementById('status-text').textContent = '就绪';
+                document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-slate-500';
+            }
+        }
+
+        function handleMainAction() {
+            if (state.ended) {
+                resetSimulation();
+                startSimulation();
+            } else if (state.running) {
+                state.running = false;
+                state.paused = true;
+            } else {
+                startSimulation();
+            }
+            updateUI();
+        }
+
+        function startSimulation() {
+            state.running = true;
+            state.paused = false;
+            state.ended = false;
+            successMsg.style.opacity = '0';
+            animate();
+        }
+
+        function resetSimulation() {
+            state.running = false;
+            state.paused = false;
+            state.ended = false;
+            state.progress = 0;
+            state.boxValue = null;
+            state.particles = [];
+            successMsg.style.opacity = '0';
+            updateUI();
+            draw();
+        }
+
+        function applyPreset(index) {
+            const config = JSON.parse(document.getElementById('widget-config').textContent);
+            const preset = config.presets[index].variables;
+            
+            state.inputValue = preset.input_number;
+            state.speed = preset.flow_speed;
+            state.variableName = preset.variable_name;
+            
+            numSlider.value = state.inputValue;
+            numDisplay.textContent = state.inputValue;
+            speedSlider.value = state.speed;
+            speedDisplay.textContent = state.speed;
+            variableInput.value = state.variableName;
+            
+            resetSimulation();
+        }
+
+        // --- Drawing Logic ---
+
+        function drawFunnel(x, y, scale) {
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 4 * scale;
+            ctx.fillStyle = 'rgba(71, 85, 105, 0.1)';
+            
+            // Funnel body
+            ctx.beginPath();
+            ctx.moveTo(x - 60 * scale, y - 80 * scale);
+            ctx.lineTo(x + 60 * scale, y - 80 * scale);
+            ctx.lineTo(x + 20 * scale, y);
+            ctx.lineTo(x + 20 * scale, y + 100 * scale);
+            ctx.lineTo(x - 20 * scale, y + 100 * scale);
+            ctx.lineTo(x - 20 * scale, y);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Label
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = `bold ${16 * scale}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.fillText('std::cin', x, y - 90 * scale);
+        }
+
+        function drawBox(x, y, name, value, scale) {
+            const w = 120 * scale;
+            const h = 80 * scale;
+            
+            // Box shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.fillRect(x - w/2 + 5, y - h/2 + 5, w, h);
+
+            // Box body
+            ctx.fillStyle = '#334155';
+            ctx.strokeStyle = '#2563eb';
+            ctx.lineWidth = 3 * scale;
+            ctx.fillRect(x - w/2, y - h/2, w, h);
+            ctx.strokeRect(x - w/2, y - h/2, w, h);
+
+            // Lid (open)
+            ctx.beginPath();
+            ctx.moveTo(x - w/2, y - h/2);
+            ctx.lineTo(x - w/2 - 20*scale, y - h/2 - 20*scale);
+            ctx.lineTo(x + w/2 - 20*scale, y - h/2 - 20*scale);
+            ctx.lineTo(x + w/2, y - h/2);
+            ctx.fillStyle = '#475569';
+            ctx.fill();
+            ctx.stroke();
+
+            // Label
+            ctx.fillStyle = '#a78bfa';
+            ctx.font = `${14 * scale}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.fillText('变量: ' + name, x, y + h/2 + 25 * scale);
+
+            // Inside value
+            if (value !== null) {
+                ctx.fillStyle = '#fff';
+                ctx.font = `bold ${24 * scale}px monospace`;
+                ctx.fillText(value, x, y + 8 * scale);
+            } else {
+                ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                ctx.font = `italic ${14 * scale}px monospace`;
+                ctx.fillText('?', x, y + 5 * scale);
+            }
+        }
+
+        function drawKeyboard(x, y, scale) {
+            ctx.fillStyle = '#1e293b';
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 2 * scale;
+            
+            const kw = 140 * scale;
+            const kh = 80 * scale;
+            
+            ctx.beginPath();
+            ctx.roundRect(x - kw/2, y - kh/2, kw, kh, 10);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Keys
+            ctx.fillStyle = '#334155';
+            for(let i=0; i<3; i++) {
+                for(let j=0; j<4; j++) {
+                    ctx.fillRect(x - kw/2 + 10 + j*30*scale, y - kh/2 + 10 + i*20*scale, 20*scale, 12*scale);
+                }
+            }
+
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = `bold ${14 * scale}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText('键盘输入', x, y + kh/2 + 25 * scale);
+        }
+
+        function drawArrow(x1, y1, x2, y2, scale) {
+            const headlen = 15 * scale;
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            
+            ctx.strokeStyle = 'rgba(139, 92, 246, 0.4)';
+            ctx.lineWidth = 8 * scale;
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+            
+            ctx.fillStyle = 'rgba(139, 92, 246, 0.8)';
+            ctx.beginPath();
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2 - headlen * Math.cos(angle - Math.PI / 6), y2 - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(x2 - headlen * Math.cos(angle + Math.PI / 6), y2 - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+
+            // Extraction operator symbol
+            ctx.fillStyle = '#2563eb';
+            ctx.font = `bold ${24 * scale}px monospace`;
+            ctx.fillText('>>', (x1 + x2) / 2, (y1 + y2) / 2 - 20 * scale);
+        }
+
+        function drawDataPacket(x, y, val, scale, alpha = 1) {
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = '#2563eb';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#2563eb';
+            
+            ctx.beginPath();
+            ctx.arc(x, y, 20 * scale, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#fff';
+            ctx.font = `bold ${16 * scale}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(val, x, y);
+            ctx.globalAlpha = 1;
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, layout.width, layout.height);
+            
+            const scale = layout.width < 600 ? 0.7 : 1.0;
+            
+            // Draw Components
+            drawKeyboard(layout.sourceX, layout.centerY - 50, scale);
+            drawFunnel(layout.centerX, layout.centerY - 50, scale);
+            drawBox(layout.sinkX, layout.centerY + 50, state.variableName, state.boxValue, scale);
+            
+            // Connecting Arrow (Extraction)
+            drawArrow(layout.centerX + 30 * scale, layout.centerY + 50, layout.sinkX - 70 * scale, layout.centerY + 50, scale);
+
+            // Path calculation
+            let packetX, packetY;
+            let phase = '';
+            
+            if (state.progress < 0.4) {
+                // Phase 1: Keyboard to Funnel
+                const p = state.progress / 0.4;
+                packetX = layout.sourceX + (layout.centerX - layout.sourceX) * p;
+                packetY = (layout.centerY - 50) + (layout.centerY - 130 - (layout.centerY - 50)) * Math.sin(p * Math.PI);
+                phase = '数据从键盘缓冲区进入 cin 流';
+            } else if (state.progress < 0.7) {
+                // Phase 2: Through Funnel
+                const p = (state.progress - 0.4) / 0.3;
+                packetX = layout.centerX;
+                packetY = (layout.centerY - 100 * scale) + (150 * scale) * p;
+                phase = '>> 运算符正在提取数据';
+            } else {
+                // Phase 3: Extraction operator to Box
+                const p = (state.progress - 0.7) / 0.3;
+                packetX = (layout.centerX) + (layout.sinkX - layout.centerX) * p;
+                packetY = (layout.centerY + 50);
+                phase = '数据被存入内存地址对应的变量中';
+            }
+
+            // Draw current moving packet
+            if (state.running || state.paused) {
+                drawDataPacket(packetX, packetY, state.inputValue, scale);
+                
+                // Tooltip explaining phase
+                ctx.fillStyle = 'rgba(255,255,255,0.8)';
+                ctx.font = `${14 * scale}px sans-serif`;
+                ctx.fillText(phase, layout.centerX, layout.height - 30);
+            }
+
+            // Particles for effect
+            if (state.running) {
+                if (Math.random() > 0.5) {
+                    state.particles.push({
+                        x: packetX,
+                        y: packetY,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: (Math.random() - 0.5) * 2,
+                        life: 1.0
+                    });
+                }
+            }
+
+            state.particles.forEach((p, index) => {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = '#2563eb';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 2 * scale, 0, Math.PI * 2);
+                ctx.fill();
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.02;
+                if (p.life <= 0) state.particles.splice(index, 1);
+            });
+            ctx.globalAlpha = 1;
+        }
+
+        function animate() {
+            if (state.running) {
+                state.progress += 0.002 * state.speed;
+                
+                if (state.progress >= 1) {
+                    state.progress = 1;
+                    state.running = false;
+                    state.ended = true;
+                    state.boxValue = state.inputValue;
+                    successMsg.style.opacity = '1';
+                    updateUI();
+                }
+                
+                draw();
+                requestAnimationFrame(animate);
+            }
+        }
+
+        // Initialize
+        resize();
+        updateUI();
+
+        // --- Teacher Interaction Message Listener ---
+        window.addEventListener('message', function(event) {
+            const { type, target, state: newState, content } = event.data;
+
+            switch (type) {
+                case 'SET_WIDGET_STATE':
+                    if (newState) {
+                        if (newState.input_number !== undefined) {
+                            state.inputValue = newState.input_number;
+                            numSlider.value = newState.input_number;
+                            numDisplay.textContent = newState.input_number;
+                        }
+                        if (newState.flow_speed !== undefined) {
+                            state.speed = newState.flow_speed;
+                            speedSlider.value = newState.flow_speed;
+                            speedDisplay.textContent = newState.flow_speed;
+                        }
+                        if (newState.variable_name !== undefined) {
+                            state.variableName = newState.variable_name;
+                            variableInput.value = newState.variable_name;
+                        }
+                        resetSimulation();
+                        updateUI();
+                    }
+                    break;
+
+                case 'HIGHLIGHT_ELEMENT':
+                    const el = document.getElementById(target + '-slider') || document.getElementById(target + '-input') || document.getElementById(target);
+                    if (el) {
+                        el.style.outline = '3px solid rgba(139, 92, 246, 0.8)';
+                        el.style.outlineOffset = '4px';
+                        el.style.animation = 'pulse-highlight 2s infinite';
+                        setTimeout(() => {
+                            el.style.outline = '';
+                            el.style.animation = '';
+                        }, 3000);
+                    }
+                    break;
+
+                case 'ANNOTATE_ELEMENT':
+                    const targetEl = document.getElementById(target) || canvas;
+                    if (targetEl && content) {
+                        const rect = targetEl.getBoundingClientRect();
+                        const tooltip = document.createElement('div');
+                        tooltip.className = 'teacher-annotation';
+                        tooltip.style.cssText = 'position:fixed; top:' + (rect.top - 40) + 'px; left:' + rect.left + 'px; background:rgba(139,92,246,0.95); color:white; padding:8px 12px; border-radius:8px; font-size:14px; z-index:1000; animation:fadeIn 0.3s;';
+                        tooltip.textContent = content;
+                        document.body.appendChild(tooltip);
+                        setTimeout(() => tooltip.remove(), 4000);
+                    }
+                    break;
+            }
+        });
+
+        const style = document.createElement('style');
+        style.textContent = '@keyframes pulse-highlight { 0%, 100% { outline-color: rgba(139, 92, 246, 0.8); } 50% { outline-color: rgba(139, 92, 246, 0.4); } } @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }';
+        document.head.appendChild(style);
+
+        // Keyboard support
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                handleMainAction();
+            } else if (e.code === 'KeyR') {
+                resetSimulation();
+            }
+        });
+    </script>
+</body>
+</html>

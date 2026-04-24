@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>时空穿梭机：闰年大挑战 - 王老师的课堂笔记</title>
+    <style>
+        :root {
+            --space-bg: #0a0a1a;
+            --brand: #2563eb;
+            --brand-glow: rgba(37, 99, 235, 0.4);
+            --text-gold: #fbbf24;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--space-bg);
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: calc(100vh - 48px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas {
+            display: block;
+            max-width: 100%;
+            max-height: 100%;
+            background: radial-gradient(circle at center, #1b2735 0%, #090a0f 100%);
+            box-shadow: 0 0 20px var(--brand-glow);
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud {
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 20px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+            pointer-events: auto;
+        }
+
+        #score-display { color: var(--brand); }
+        #combo-display { color: #f472b6; }
+        #formula-hint { 
+            position: absolute; 
+            bottom: 120px; 
+            left: 50%; 
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.6);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            color: var(--text-gold);
+            border: 1px solid var(--text-gold);
+        }
+
+        #start-screen, #game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 26, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            pointer-events: auto;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: var(--brand);
+            text-shadow: 0 0 20px var(--brand-glow);
+            margin-bottom: 10px;
+        }
+
+        .instruction-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            max-width: 500px;
+            border: 1px solid var(--brand);
+        }
+
+        .mnemonic {
+            color: var(--text-gold);
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin: 10px 0;
+        }
+
+        .btn {
+            background: var(--brand);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 0 15px var(--brand-glow);
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 25px var(--brand-glow);
+        }
+
+        .hidden { display: none !important; }
+
+        .controls {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            pointer-events: auto;
+        }
+
+        .control-btn {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid var(--brand);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2rem;
+            user-select: none;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .control-btn:active {
+            background: var(--brand);
+            color: white;
+        }
+
+        #achievement-popup {
+            position: absolute;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(37, 99, 235, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.5s;
+            z-index: 50;
+        }
+    </style>
+
+<link rel="stylesheet" href="../assets/css/katex.min.css">
+<script src="../assets/js/katex.min.js"></script>
+<script src="../assets/js/auto-render.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const katexOptions = {
+        delimiters: [
+            {left: '\\[', right: '\\]', display: true},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false}
+        ],
+        throwOnError: false,
+        strict: false,
+        trust: true
+    };
+
+    let renderTimeout;
+    function safeRender() {
+        if (renderTimeout) clearTimeout(renderTimeout);
+        renderTimeout = setTimeout(() => {
+            renderMathInElement(document.body, katexOptions);
+        }, 100);
+    }
+
+    renderMathInElement(document.body, katexOptions);
+
+    const observer = new MutationObserver((mutations) => {
+        let shouldRender = false;
+        mutations.forEach((mutation) => {
+            if (mutation.target &&
+                mutation.target.className &&
+                typeof mutation.target.className === 'string' &&
+                mutation.target.className.includes('katex')) {
+                return;
+            }
+            shouldRender = true;
+        });
+
+        if (shouldRender) {
+            safeRender();
+        }
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+    });
+
+    setInterval(() => {
+        const text = document.body.innerText;
+        if (text.includes('\\(') || text.includes('$$')) {
+            safeRender();
+        }
+    }, 2000);
+});
+</script>
+</head>
+<body style="margin:0;margin-top:48px;">
+<!-- 统一导航栏 -->
+<nav style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fff;border-bottom:1px solid #e5e7eb;height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;">
+    <a href="../index.html" style="display:flex;align-items:center;gap:6px;text-decoration:none;color:#6b7280;font-size:13px;transition:color 0.2s;" onmouseover="this.style.color='#2563eb'" onmouseout="this.style.color='#6b7280'">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        返回首页
+    </a>
+    <span style="font-size:12px;color:#9ca3af;">王老师的课堂笔记</span>
+</nav>
+
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div class="hud">
+            <div id="score-display">分数: 0</div>
+            <div id="combo-display">连击: x0</div>
+        </div>
+        <div id="formula-hint">四年一闰，百年不闰，四百年再闰！</div>
+        
+        <div class="controls">
+            <div class="control-btn" id="btn-up">↑</div>
+            <div class="control-btn" id="btn-down">↓</div>
+        </div>
+    </div>
+
+    <div id="start-screen">
+        <h1>🚀 闰年大挑战</h1>
+        <div class="instruction-card">
+            <p>控制时空飞船穿过正确的<b>「闰年」</b>门户！</p>
+            <p class="mnemonic">"四年一闰，百年不闰，四百年再闰"</p>
+            <p>使用 ↑↓ 键或屏幕按钮控制飞船轨道。</p>
+        </div>
+        <button class="btn" onclick="startGame()">开始穿梭</button>
+    </div>
+
+    <div id="game-over" class="hidden">
+        <h1 id="over-title">任务结束</h1>
+        <div class="instruction-card">
+            <p id="final-score">最终得分: 0</p>
+            <p id="high-score">最高记录: 0</p>
+        </div>
+        <button class="btn" onclick="startGame()">再次出发</button>
+    </div>
+
+    <div id="achievement-popup">成就解锁！</div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreDisplay = document.getElementById('score-display');
+    const comboDisplay = document.getElementById('combo-display');
+    const startScreen = document.getElementById('start-screen');
+    const gameOverScreen = document.getElementById('game-over');
+    const finalScoreText = document.getElementById('final-score');
+    const highScoreText = document.getElementById('high-score');
+    const achievementPopup = document.getElementById('achievement-popup');
+
+    // Game Constants
+    const LANES = 3;
+    const LANE_HEIGHT = 100;
+    const SHIP_X = 100;
+    const GATE_WIDTH = 120;
+    const BASE_SPEED = 4;
+    // 速度恒定，不再递增
+
+    // Game State
+    let state = {
+        active: false,
+        score: 0,
+        highScore: localStorage.getItem('leap_year_highscore') || 0,
+        combo: 0,
+        speed: BASE_SPEED,
+        shipLane: 1,
+        shipVisualY: 200,
+        gates: [],
+        stars: [],
+        lastGateTime: 0,
+        difficulty: 1
+    };
+
+    // Responsive Canvas
+    function resize() {
+        canvas.width = Math.min(window.innerWidth, 800);
+        canvas.height = 500;
+        state.shipVisualY = getLaneY(state.shipLane);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function getLaneY(laneIndex) {
+        const centerY = canvas.height / 2;
+        return centerY + (laneIndex - 1) * LANE_HEIGHT;
+    }
+
+    // Star Background
+    function initStars() {
+        state.stars = [];
+        for (let i = 0; i < 100; i++) {
+            state.stars.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 2,
+                speed: Math.random() * 2 + 0.5
+            });
+        }
+    }
+
+    function isLeapYear(y) {
+        return (y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0);
+    }
+
+    function generateYear() {
+        const rand = Math.random();
+        let year;
+        
+        if (state.difficulty < 2) {
+            year = 1990 + Math.floor(Math.random() * 50);
+        } else if (state.difficulty < 5) {
+            if (rand < 0.3) year = (16 + Math.floor(Math.random() * 8)) * 100;
+            else year = 1800 + Math.floor(Math.random() * 400);
+        } else {
+            year = 1 + Math.floor(Math.random() * 3000);
+        }
+        return year;
+    }
+
+    function spawnGateSet() {
+        const years = [];
+        const correctLane = Math.floor(Math.random() * LANES);
+        
+        for (let i = 0; i < LANES; i++) {
+            let y;
+            if (i === correctLane) {
+                do { y = generateYear(); } while (!isLeapYear(y));
+            } else {
+                do { y = generateYear(); } while (isLeapYear(y));
+            }
+            years.push({ year: y, lane: i });
+        }
+
+        state.gates.push({
+            x: canvas.width + 100,
+            options: years,
+            passed: false
+        });
+    }
+
+    function showAchievement(msg) {
+        achievementPopup.innerText = msg;
+        achievementPopup.style.opacity = 1;
+        setTimeout(() => { achievementPopup.style.opacity = 0; }, 2000);
+    }
+
+    window.startGame = function() {
+        state.active = true;
+        state.score = 0;
+        state.combo = 0;
+        state.speed = BASE_SPEED; // 速度恒定
+        state.shipLane = 1;
+        state.shipVisualY = getLaneY(1);
+        state.gates = [];
+        state.difficulty = 1;
+        state.lastGateTime = performance.now();
+        
+        scoreDisplay.innerText = `分数: 0`;
+        comboDisplay.innerText = `连击: x0`;
+        
+        initStars();
+        startScreen.classList.add('hidden');
+        gameOverScreen.classList.add('hidden');
+        
+        setTimeout(() => {
+            if(state.active) spawnGateSet();
+        }, 1000);
+
+        requestAnimationFrame(gameLoop);
+    };
+
+    function moveShip(dir) {
+        if (!state.active) return;
+        if (dir === 'up' && state.shipLane > 0) state.shipLane--;
+        if (dir === 'down' && state.shipLane < LANES - 1) state.shipLane++;
+    }
+
+    // Input Handling
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowUp') moveShip('up');
+        if (e.key === 'ArrowDown') moveShip('down');
+    });
+
+    document.getElementById('btn-up').onclick = (e) => { e.preventDefault(); moveShip('up'); };
+    document.getElementById('btn-down').onclick = (e) => { e.preventDefault(); moveShip('down'); };
+
+    function update() {
+        if (!state.active) return;
+
+        // Move stars
+        state.stars.forEach(s => {
+            s.x -= s.speed;
+            if (s.x < 0) s.x = canvas.width;
+        });
+
+        // Ease ship position
+        const targetY = getLaneY(state.shipLane);
+        state.shipVisualY += (targetY - state.shipVisualY) * 0.2;
+
+        // Move gates (速度恒定，不再递增)
+        for (let i = state.gates.length - 1; i >= 0; i--) {
+            const g = state.gates[i];
+            g.x -= state.speed; // 始终 BASE_SPEED
+
+            // Collision check
+            if (!g.passed && g.x < SHIP_X + 40 && g.x > SHIP_X - 40) {
+                const shipYear = g.options[state.shipLane].year;
+                if (isLeapYear(shipYear)) {
+                    state.score += 10;
+                    state.combo++;
+                    // 速度不再递增：去掉 state.speed += SPEED_INCREMENT
+                    state.difficulty = 1 + Math.floor(state.score / 100);
+                    scoreDisplay.innerText = `分数: ${state.score}`;
+                    comboDisplay.innerText = `连击: x${state.combo}`;
+                    g.passed = true;
+                    
+                    if (state.combo === 5) showAchievement("时空稳定！");
+                    if (state.combo === 15) showAchievement("穿梭大师！");
+                } else {
+                    endGame();
+                }
+            }
+
+            if (g.x < -200) state.gates.splice(i, 1);
+        }
+
+        // Spawn logic
+        const now = performance.now();
+        const spawnInterval = 2500; // 固定生成间隔
+        if (now - state.lastGateTime > spawnInterval) {
+            spawnGateSet();
+            state.lastGateTime = now;
+        }
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Stars
+        ctx.fillStyle = "white";
+        state.stars.forEach(s => {
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // Draw Lanes (Paths)
+        ctx.strokeStyle = "rgba(37, 99, 235, 0.15)";
+        ctx.lineWidth = 2;
+        for (let i = 0; i < LANES; i++) {
+            const y = getLaneY(i);
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(canvas.width, y);
+            ctx.stroke();
+        }
+
+        // Draw Gates - 统一颜色（不区分闰年/非闰年，提高难度）
+        state.gates.forEach(g => {
+            g.options.forEach(opt => {
+                const y = getLaneY(opt.lane);
+                
+                // Portal Glow - 统一品牌蓝光晕
+                const gradient = ctx.createRadialGradient(g.x, y, 10, g.x, y, 40);
+                gradient.addColorStop(0, "rgba(37, 99, 235, 0.3)");
+                gradient.addColorStop(1, "transparent");
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(g.x, y, 50, 0, Math.PI*2);
+                ctx.fill();
+
+                // Ring - 统一品牌蓝虚线环
+                ctx.strokeStyle = "#2563eb";
+                ctx.lineWidth = 3;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.arc(g.x, y, 40, 0, Math.PI*2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Year Text - 统一白色
+                ctx.fillStyle = "white";
+                ctx.font = "bold 18px Arial";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(opt.year, g.x, y);
+                
+                // 不再显示 LEAP/COMMON 标签提示
+            });
+        });
+
+        // Draw Ship
+        ctx.save();
+        ctx.translate(SHIP_X, state.shipVisualY);
+        
+        // Ship Body
+        ctx.fillStyle = "#fff";
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#2563eb";
+        ctx.beginPath();
+        ctx.moveTo(30, 0);
+        ctx.lineTo(-10, -15);
+        ctx.lineTo(-5, 0);
+        ctx.lineTo(-10, 15);
+        ctx.closePath();
+        ctx.fill();
+
+        // Engine Flame
+        if (state.active) {
+            ctx.fillStyle = state.combo > 5 ? "#f472b6" : "#2563eb";
+            ctx.beginPath();
+            ctx.moveTo(-10, -5);
+            ctx.lineTo(-20 - Math.random() * 10, 0);
+            ctx.lineTo(-10, 5);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    function endGame() {
+        state.active = false;
+        if (state.score > state.highScore) {
+            state.highScore = state.score;
+            localStorage.setItem('leap_year_highscore', state.score);
+        }
+        
+        finalScoreText.innerText = `最终得分: ${state.score}`;
+        highScoreText.innerText = `最高记录: ${state.highScore}`;
+        gameOverScreen.classList.remove('hidden');
+    }
+
+    function gameLoop() {
+        if (!state.active) return;
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+});
+</script>
+
+
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{title}} - 王老师的课堂笔记</title>
+    <link rel="icon" href="../../assets/favicon.ico">
+    <script src="../../assets/js/tailwind.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50:'#eff6ff', 100:'#dbeafe', 200:'#bfdbfe', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8' }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="../../assets/css/prism-one-light.min.css">
+    <script src="../../assets/js/prism-bundle.min.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; }
+        pre[class*="language-"] { margin: 0; border-radius: 0.75rem; font-size: 14px; line-height: 1.7; }
+        code[class*="language-"] { font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Menlo', 'Consolas', monospace; }
+        .copy-btn { transition: all 0.15s ease; }
+        .copy-btn:hover { background-color: #2563eb; color: white; }
+        .copy-btn.copied { background-color: #10b981; color: white; }
+
+        /* Markdown 内容样式 */
+        .md-content h1 { font-size: 1.5rem; font-weight: 700; color: #111827; margin-top: 2rem; margin-bottom: 0.75rem; }
+        .md-content h2 { font-size: 1.25rem; font-weight: 600; color: #1f2937; margin-top: 1.75rem; margin-bottom: 0.5rem; padding-bottom: 0.375rem; border-bottom: 1px solid #e5e7eb; }
+        .md-content h3 { font-size: 1.1rem; font-weight: 600; color: #374151; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        .md-content p { color: #4b5563; line-height: 1.75; margin-bottom: 0.75rem; }
+        .md-content ul, .md-content ol { color: #4b5563; padding-left: 1.5rem; margin-bottom: 0.75rem; }
+        .md-content li { margin-bottom: 0.375rem; line-height: 1.7; }
+        .md-content ul li { list-style-type: disc; }
+        .md-content ol li { list-style-type: decimal; }
+        .md-content strong { color: #111827; font-weight: 600; }
+        .md-content code { background-color: #f3f4f6; padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.85em; color: #dc2626; }
+        .md-content pre { margin-bottom: 1rem; }
+        .md-content pre code { background: none; padding: 0; color: inherit; }
+        .md-content blockquote { border-left: 3px solid #3b82f6; background: #eff6ff; padding: 0.75rem 1rem; border-radius: 0 0.5rem 0.5rem 0; margin-bottom: 1rem; }
+        .md-content blockquote p { color: #1e40af; margin-bottom: 0; }
+        .md-content hr { border: none; border-top: 1px solid #e5e7eb; margin: 1.5rem 0; }
+        .md-content table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+        .md-content th, .md-content td { border: 1px solid #e5e7eb; padding: 0.5rem 0.75rem; text-align: left; }
+        .md-content th { background: #f9fafb; font-weight: 600; color: #374151; }
+        .md-content a { color: #2563eb; text-decoration: underline; }
+
+        /* 嵌入 iframe 样式 */
+        .md-content iframe {
+            width: 100%;
+            min-height: 400px;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.75rem;
+            margin: 1rem 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        /* 标签区域 */
+        .tag-entry { background-color: #f3f4f6; color: #4b5563; }
+        .tag-green { background-color: #dcfce7; color: #16a34a; }
+        .tag-yellow { background-color: #fef9c3; color: #ca8a04; }
+        .tag-orange { background-color: #ffedd5; color: #ea580c; }
+        .tag-red { background-color: #fee2e2; color: #dc2626; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- 顶部导航 -->
+    <header class="bg-white border-b border-gray-200">
+        <div class="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+            <a href="../../index.html" class="flex items-center gap-2 text-gray-500 hover:text-brand-600 transition-colors text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                返回首页
+            </a>
+            <span class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-semibold rounded">C++ 模板</span>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 py-8">
+        <!-- 标题区（从 frontmatter 渲染） -->
+        <div class="mb-8">
+            <h1 class="text-2xl font-bold text-gray-900">{{heading}}</h1>
+            <p class="text-gray-500 mt-2">{{subtitle}}</p>
+            <div class="flex items-center gap-2 mt-3 flex-wrap">
+                {{tags_html}}
+            </div>
+        </div>
+
+        <!-- Markdown 正文 -->
+        <div class="md-content">
+            {{content}}
+        </div>
+    </main>
+
+    <footer class="max-w-4xl mx-auto px-4 py-6 text-center">
+        <a href="../../index.html" class="text-xs text-gray-400 hover:text-brand-500 transition-colors">返回首页</a>
+    </footer>
+
+    <!-- 复制代码按钮脚本 -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 为每个代码块添加复制按钮
+            document.querySelectorAll('pre').forEach(pre => {
+                const btn = document.createElement('button');
+                btn.className = 'copy-btn absolute top-3 right-3 z-10 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-500 font-medium shadow-sm';
+                btn.textContent = '复制代码';
+                btn.addEventListener('click', () => {
+                    const code = pre.querySelector('code') ? pre.querySelector('code').textContent : pre.textContent;
+                    navigator.clipboard.writeText(code).then(() => {
+                        btn.textContent = '已复制';
+                        btn.classList.add('copied');
+                        setTimeout(() => { btn.textContent = '复制代码'; btn.classList.remove('copied'); }, 2000);
+                    });
+                });
+                pre.style.position = 'relative';
+                pre.appendChild(btn);
+            });
+
+            // 代码块高亮
+            if (window.Prism) Prism.highlightAll();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+# ===== 构建产物（由 build.py 生成，CI 中重新构建） =====
+cpp/dist/
+index.html
+
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+
+# ===== macOS =====
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ===== 编辑器 / IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ===== 其他 =====
+Thumbs.db
