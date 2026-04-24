@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>树形 DP 求树的中心 - 王老师的课堂笔记</title>
+    <script src="../assets/js/tailwind.js"></script>
+    <style>
+        :root { --primary: #2563eb; --primary-dark: #1d4ed8; --bg-canvas: #0f172a; }
+        body { margin:0; overflow:hidden; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:#1e293b; color:white; touch-action:manipulation; height:100vh; }
+        canvas { display:block; width:100%; height:100%; background:var(--bg-canvas); }
+        .control-panel { background:rgba(30,41,59,0.9); backdrop-filter:blur(8px); border-bottom:1px solid rgba(255,255,255,0.1); z-index:50; }
+        @media(min-width:768px) { .control-panel { width:340px; height:100%; border-bottom:none; border-right:1px solid rgba(255,255,255,0.1); } }
+        input[type=range] { height:38px; -webkit-appearance:none; width:100%; background:transparent; }
+        input[type=range]:focus { outline:none; }
+        input[type=range]::-webkit-slider-runnable-track { width:100%; height:8px; cursor:pointer; background:#334155; border-radius:4px; }
+        input[type=range]::-webkit-slider-thumb { height:24px; width:24px; border-radius:50%; background:var(--primary); cursor:pointer; -webkit-appearance:none; margin-top:-8px; box-shadow:0 0 10px rgba(37,99,235,0.5); }
+        .btn-primary { background-color:var(--primary); transition:all 0.2s; min-height:44px; }
+        .btn-primary:hover { background-color:var(--primary-dark); transform:translateY(-1px); }
+        .btn-primary:active { transform:translateY(0); }
+        .status-badge { padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600; }
+        .status-running { background:#10b981; } .status-paused { background:#f59e0b; } .status-ended { background:#2563eb; }
+        #message-box { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(15,23,42,0.85); padding:12px 24px; border-radius:12px; border:1px solid rgba(37,99,235,0.3); text-align:center; max-width:90%; pointer-events:none; transition:all 0.3s; }
+        .dp-table { font-size:11px; }
+        .dp-table td, .dp-table th { padding:2px 6px; text-align:center; border:1px solid #334155; }
+        .dp-table th { background:#1e293b; color:#94a3b8; font-weight:600; }
+        .dp-table .highlight { background:rgba(37,99,235,0.3); }
+        .dp-table .center-row { background:rgba(249,115,22,0.3); }
+    </style>
+</head>
+<body class="flex flex-col md:flex-row">
+
+<div id="controls" class="control-panel flex flex-col p-4 shrink-0 overflow-y-auto max-h-[50vh] md:max-h-screen">
+    <div class="mb-4">
+        <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400">树的中心：树形 DP</h1>
+        <p class="text-slate-400 text-sm mt-1">换根 DP：d1/d2/up 三状态</p>
+    </div>
+    <div class="space-y-4">
+        <div>
+            <div class="flex justify-between mb-2">
+                <label class="text-sm font-medium">演示速度</label>
+                <span id="speed-display" class="text-primary font-mono font-bold">1.5x</span>
+            </div>
+            <input type="range" id="speed-slider" min="0.5" max="3" step="0.1" value="1.5">
+        </div>
+        <div class="pt-2 flex flex-col gap-3">
+            <button id="main-btn" class="btn-primary w-full rounded-lg font-bold text-white shadow-lg">启动演示</button>
+            <button id="reset-btn" class="w-full py-2 rounded-lg font-medium text-slate-300 border border-slate-600 hover:bg-slate-700 transition-colors">重置（新树）</button>
+        </div>
+        <div class="mt-3 bg-slate-800/50 p-3 rounded-lg border border-slate-700">
+            <h3 class="text-xs uppercase tracking-wider text-slate-500 font-bold mb-2">阶段说明</h3>
+            <div class="text-sm space-y-2 text-slate-300">
+                <div id="phase-1" class="flex items-center gap-2 opacity-50"><span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>dfs_down: 求d1(最远)/d2(次远)/p1</span></div>
+                <div id="phase-2" class="flex items-center gap-2 opacity-50"><span class="w-2 h-2 rounded-full bg-blue-500"></span><span>dfs_up: 换根求up</span></div>
+                <div id="phase-3" class="flex items-center gap-2 opacity-50"><span class="w-2 h-2 rounded-full bg-amber-500"></span><span>max(d1,up) 取最小 → 中心</span></div>
+            </div>
+        </div>
+        <!-- DP Table -->
+        <div id="dp-panel" class="mt-2 bg-slate-800/50 p-3 rounded-lg border border-slate-700 hidden">
+            <h3 class="text-xs uppercase tracking-wider text-slate-500 font-bold mb-2">DP 状态表</h3>
+            <div class="overflow-x-auto">
+                <table id="dp-table" class="dp-table w-full border-collapse"></table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="flex-1 relative min-h-[400px]">
+    <canvas id="canvas"></canvas>
+    <div id="message-box" class="opacity-0">准备就绪</div>
+    <div class="absolute top-4 right-4 flex flex-col gap-2 pointer-events-none">
+        <div id="status-tag" class="status-badge bg-slate-700 self-end">就绪</div>
+    </div>
+</div>
+
+<script>
+const state = {
+    running:false, paused:false, ended:false,
+    phase:0, // 0:Ready, 1:dfs_down, 1.5:Wait, 2:dfs_up, 2.5:Wait, 3:FindCenter
+    speed:1.5,
+    nodes:[], edges:[], adj:[],
+    // DP arrays
+    d1:[], d2:[], p1:[], up:[],
+    // Animation
+    processingNode:-1, processingFrom:-1,
+    downOrder:[], downIdx:0,
+    upOrder:[], upIdx:0,
+    centerNodes:[], eccentricities:[], minEcc:Infinity,
+    lastStepTime:0,
+};
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+function resize() { canvas.width=canvas.parentElement.clientWidth; canvas.height=canvas.parentElement.clientHeight; }
+window.addEventListener('resize', resize); resize();
+
+function generateRandomTree() {
+    const n = 7 + Math.floor(Math.random() * 5); // 7~11 nodes
+    const adj = Array.from({length:n}, ()=>[]);
+    for(let i=1;i<n;i++) { const p=Math.floor(Math.random()*i); adj[i].push(p); adj[p].push(i); }
+    const levels=[], vis=new Set(), q=[0]; vis.add(0);
+    while(q.length>0) {
+        const level=[], next=[];
+        for(const u of q) { level.push(u); for(const v of adj[u]) { if(!vis.has(v)) { vis.add(v); next.push(v); } } }
+        levels.push(level); q.length=0; q.push(...next);
+    }
+    const maxL=levels.length;
+    const nodes=new Array(n);
+    for(let l=0;l<levels.length;l++) {
+        const row=levels[l];
+        for(let i=0;i<row.length;i++) {
+            const id=row[i];
+            nodes[id]={id, x:(i+1)/(row.length+1), y:(l+1)/(maxL+1), currentRadius:18, color:'#334155', pulse:0};
+        }
+    }
+    const edges=[];
+    for(let u=0;u<n;u++) for(const v of adj[u]) if(u<v) edges.push({u,v,active:false,highlight:false});
+    state.nodes=nodes; state.edges=edges; state.adj=adj;
+}
+
+function initGraph() {
+    generateRandomTree();
+    const n=state.nodes.length;
+    state.d1=new Array(n).fill(0); state.d2=new Array(n).fill(0);
+    state.p1=new Array(n).fill(-1); state.up=new Array(n).fill(0);
+    state.eccentricities=new Array(n).fill(0);
+    state.centerNodes=[]; state.minEcc=Infinity;
+}
+
+function showMessage(t) { const m=document.getElementById('message-box'); m.textContent=t; m.style.opacity='1'; }
+
+function updateUI() {
+    document.getElementById('speed-display').textContent=state.speed+'x';
+    const btn=document.getElementById('main-btn'), tag=document.getElementById('status-tag');
+    if(state.ended) { btn.textContent='重新开始'; tag.textContent='已完成'; tag.className='status-badge status-ended'; }
+    else if(state.running) { btn.textContent='暂停'; tag.textContent='进行中...'; tag.className='status-badge status-running'; }
+    else if(state.paused) { btn.textContent='继续'; tag.textContent='已暂停'; tag.className='status-badge status-paused'; }
+    else { btn.textContent='启动演示'; tag.textContent='就绪'; tag.className='status-badge bg-slate-700'; }
+    ['phase-1','phase-2','phase-3'].forEach((id,i) => {
+        const el=document.getElementById(id);
+        const p=state.phase===1.5?1:state.phase===2.5?2:state.phase;
+        el.style.opacity=(p>=i+1)?'1':'0.4';
+    });
+}
+
+function updateDPTable() {
+    const n=state.nodes.length;
+    const panel=document.getElementById('dp-panel');
+    if(state.phase===0) { panel.classList.add('hidden'); return; }
+    panel.classList.remove('hidden');
+    const table=document.getElementById('dp-table');
+    let html='<tr><th>节点</th><th>d1</th><th>d2</th><th>p1</th><th>up</th><th>max(d1,up)</th></tr>';
+    for(let i=0;i<n;i++) {
+        const isCenter=state.centerNodes.includes(i);
+        const isProcessing=state.processingNode===i;
+        const ecc=Math.max(state.d1[i],state.up[i]);
+        html+=`<tr class="${isCenter?'center-row':isProcessing?'highlight':''}">
+            <td>${i}</td>
+            <td>${state.d1[i]}</td><td>${state.d2[i]}</td>
+            <td>${state.p1[i]>=0?state.p1[i]:'-'}</td>
+            <td>${state.phase>=2?state.up[i]:'-'}</td>
+            <td>${state.phase>=3?ecc:'-'}</td></tr>`;
+    }
+    table.innerHTML=html;
+}
+
+// --- dfs_down (post-order) ---
+function computeDownOrder(u, fa) {
+    for(const v of state.adj[u]) if(v!==fa) computeDownOrder(v, u);
+    state.downOrder.push(u);
+}
+
+function processDownStep() {
+    if(state.downIdx >= state.downOrder.length) {
+        state.phase=1.5;
+        showMessage('dfs_down 完成！准备 dfs_up（换根）...');
+        setTimeout(()=>{ if(state.running){ state.phase=2; state.processingNode=-1; showMessage('开始 dfs_up...'); } }, 800);
+        return;
+    }
+    const u=state.downOrder[state.downIdx];
+    state.processingNode=u;
+    state.d1[u]=0; state.d2[u]=0; state.p1[u]=-1;
+
+    for(const v of state.adj[u]) {
+        if(state.downOrder.indexOf(v)<state.downIdx && state.p1[u]!==v) { // v already processed (child)
+            // Check if v is a child (processed before u in post-order)
+        }
+    }
+    // Simpler: just iterate all neighbors, check if they were already processed
+    for(const v of state.adj[u]) {
+        if(state.downOrder.indexOf(v) < state.downIdx) { // v is a child (processed before u in post-order)
+            const childLen = state.d1[v] + 1;
+            if(childLen > state.d1[u]) {
+                state.d2[u] = state.d1[u];
+                state.d1[u] = childLen;
+                state.p1[u] = v;
+            } else if(childLen > state.d2[u]) {
+                state.d2[u] = childLen;
+            }
+        }
+    }
+    state.nodes[u].color='#10b981';
+    state.downIdx++;
+    updateDPTable();
+}
+
+// --- dfs_up (pre-order from root) ---
+function computeUpOrder(u, fa) {
+    state.upOrder.push(u);
+    for(const v of state.adj[u]) if(v!==fa) computeUpOrder(v, u);
+}
+
+function processUpStep() {
+    if(state.upIdx >= state.upOrder.length) {
+        state.phase=2.5;
+        showMessage('dfs_up 完成！计算 max(d1,up)...');
+        setTimeout(()=>{ if(state.running){ state.phase=3; findCenters(); } }, 600);
+        return;
+    }
+    const u=state.upOrder[state.upIdx];
+    state.processingNode=u;
+
+    // Find parent of u in the DFS tree (upOrder is pre-order from root=0)
+    const parent = state.upIdx===0 ? -1 : findParentInUpOrder(u);
+
+    for(const v of state.adj[u]) {
+        if(v===parent) continue; // skip parent in DFS tree
+        if(state.p1[u]===v) {
+            state.up[v] = Math.max(state.up[u], state.d2[u]) + 1;
+        } else {
+            state.up[v] = Math.max(state.up[u], state.d1[u]) + 1;
+        }
+    }
+    state.nodes[u].color='#2563eb';
+    state.upIdx++;
+    updateDPTable();
+}
+
+function findParentInUpOrder(u) {
+    // Find parent in the upOrder tree traversal
+    // The upOrder was built from root=0, so we need to find who is u's parent
+    // We can track this during computeUpOrder, but simpler: parent is the first neighbor that appears before u in upOrder
+    for(const v of state.adj[u]) {
+        if(state.upOrder.indexOf(v) < state.upOrder.indexOf(u)) return v;
+    }
+    return -1;
+}
+
+function findCenters() {
+    const n=state.nodes.length;
+    state.minEcc=Infinity;
+    state.centerNodes=[];
+    for(let i=0;i<n;i++) {
+        state.eccentricities[i] = Math.max(state.d1[i], state.up[i]);
+        if(state.eccentricities[i] < state.minEcc) {
+            state.minEcc = state.eccentricities[i];
+            state.centerNodes = [i];
+        } else if(state.eccentricities[i] === state.minEcc) {
+            state.centerNodes.push(i);
+        }
+        state.nodes[i].color='#334155';
+    }
+    // Highlight centers
+    state.centerNodes.forEach(c => { state.nodes[c].color='#f97316'; });
+
+    state.running=false; state.ended=true;
+    const centerStr=state.centerNodes.map(c=>`节点${c}`).join(' 和 ');
+    showMessage(`中心: ${centerStr}，半径=${state.minEcc}`);
+    updateDPTable();
+    updateUI();
+}
+
+// --- Draw ---
+function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    const margin=60, w=canvas.width-margin*2, h=canvas.height-margin*2;
+
+    // Edges
+    state.edges.forEach(e=>{
+        const u=state.nodes[e.u], v=state.nodes[e.v];
+        ctx.beginPath(); ctx.moveTo(u.x*w+margin, u.y*h+margin); ctx.lineTo(v.x*w+margin, v.y*h+margin);
+        if(e.active) { ctx.strokeStyle=(state.phase<=1.5)?'#10b981':'#2563eb'; ctx.lineWidth=3; ctx.stroke(); }
+        else { ctx.strokeStyle='#334155'; ctx.lineWidth=2; ctx.stroke(); }
+    });
+
+    // Nodes
+    state.nodes.forEach(n=>{
+        const px=n.x*w+margin, py=n.y*h+margin;
+        const isCenter=state.centerNodes.includes(n.id);
+        const isProcessing=state.processingNode===n.id;
+
+        if(isCenter||isProcessing) {
+            n.pulse+=0.05; const s=1+Math.sin(n.pulse)*0.2;
+            ctx.beginPath(); ctx.arc(px,py,25*s,0,Math.PI*2);
+            ctx.fillStyle=isCenter?'rgba(249,115,22,0.3)':'rgba(37,99,235,0.25)';
+            ctx.fill();
+        }
+
+        ctx.beginPath(); ctx.arc(px,py,n.currentRadius,0,Math.PI*2);
+        if(isCenter) { ctx.fillStyle='#f97316'; ctx.strokeStyle='#fed7aa'; ctx.lineWidth=3; }
+        else { ctx.fillStyle=n.color; ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=2; }
+        ctx.fill(); ctx.stroke();
+
+        // Label: node id
+        ctx.fillStyle='white'; ctx.font='bold 14px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(n.id, px, py);
+
+        // DP values below node
+        if(state.phase>=1 && state.d1[n.id]>0) {
+            ctx.fillStyle='#94a3b8'; ctx.font='10px sans-serif';
+            ctx.fillText(`d1=${state.d1[n.id]}`, px, py+28);
+        }
+        if(state.phase>=2) {
+            ctx.fillStyle='#60a5fa'; ctx.font='10px sans-serif';
+            ctx.fillText(`up=${state.up[n.id]}`, px, py+40);
+        }
+        if(state.phase>=3) {
+            const ecc=state.eccentricities[n.id];
+            ctx.fillStyle=isCenter?'#f97316':'#94a3b8'; ctx.font='bold 11px sans-serif';
+            ctx.fillText(`ecc=${ecc}`, px, py+52);
+        }
+
+        if(isCenter&&state.phase>=3) { ctx.fillStyle='#f97316'; ctx.font='bold 12px sans-serif'; ctx.fillText('中心', px, py-28); }
+    });
+
+    // Step
+    if(state.running && !state.paused) {
+        const now=Date.now();
+        if(now-state.lastStepTime > 800/state.speed) {
+            if(state.phase===1) processDownStep();
+            else if(state.phase===2) processUpStep();
+            state.lastStepTime=now;
+        }
+    }
+    requestAnimationFrame(draw);
+}
+
+// --- Controls ---
+function resetSimulation() {
+    state.running=false; state.paused=false; state.ended=false; state.phase=0;
+    state.downOrder=[]; state.downIdx=0;
+    state.upOrder=[]; state.upIdx=0;
+    state.centerNodes=[]; state.processingNode=-1;
+    initGraph(); showMessage('已重置（新随机树）'); updateUI(); updateDPTable();
+}
+
+function toggleSimulation() {
+    if(state.ended) { resetSimulation(); setTimeout(toggleSimulation,100); return; }
+    if(state.running) { state.running=false; state.paused=true; }
+    else {
+        if(!state.paused) {
+            state.phase=1;
+            // Compute traversal orders
+            state.downOrder=[]; computeDownOrder(0, -1);
+            state.upOrder=[]; computeUpOrder(0, -1);
+            state.downIdx=0; state.upIdx=0;
+            showMessage('开始 dfs_down（自底向上）...');
+        }
+        state.running=true; state.paused=false;
+    }
+    updateUI();
+}
+
+document.getElementById('main-btn').addEventListener('click', toggleSimulation);
+document.getElementById('reset-btn').addEventListener('click', resetSimulation);
+document.getElementById('speed-slider').addEventListener('input', e=>{ state.speed=parseFloat(e.target.value); updateUI(); });
+window.addEventListener('keydown', e=>{ if(e.code==='Space'){e.preventDefault();toggleSimulation();} else if(e.code==='KeyR') resetSimulation(); });
+
+initGraph(); updateUI(); draw();
+</script>
+</body>
+</html>

@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>超级树屋设计师</title>
+    <style>
+        :root {
+            --tree-brown: #5D4037;
+            --leaf-green: #4CAF50;
+            --leaf-dark: #2E7D32;
+            --accent-gold: #2563eb;
+            --bg-sky: #E3F2FD;
+            --panel-bg: rgba(255, 255, 255, 0.9);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-sky);
+            overflow: hidden;
+            touch-action: none;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #game-container {
+            position: relative;
+            flex-grow: 1;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: crosshair;
+        }
+
+        /* UI Overlays */
+        .hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .stat-card {
+            background: var(--panel-bg);
+            padding: 8px 15px;
+            border-radius: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            font-weight: bold;
+            color: var(--tree-brown);
+            pointer-events: auto;
+            border: 2px solid var(--tree-brown);
+        }
+
+        .instruction-panel {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--panel-bg);
+            padding: 10px 20px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            width: 80%;
+            max-width: 400px;
+            border-left: 5px solid var(--leaf-green);
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            padding: 10px;
+            z-index: 20;
+        }
+
+        button {
+            background: var(--tree-brown);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #3e2723;
+            transition: transform 0.1s, box-shadow 0.1s;
+            min-width: 100px;
+        }
+
+        button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #3e2723;
+        }
+
+        button.secondary {
+            background: var(--leaf-green);
+            box-shadow: 0 4px 0 #1b5e20;
+        }
+
+        /* Screens */
+        .overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .hidden { display: none !important; }
+
+        .card {
+            background: white;
+            color: #333;
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 400px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+
+        h1 { margin-top: 0; color: var(--tree-brown); }
+        .achievement {
+            display: inline-block;
+            margin: 5px;
+            padding: 5px 10px;
+            background: #fff9c4;
+            border-radius: 10px;
+            font-size: 0.9em;
+            border: 1px solid #fbc02d;
+        }
+
+        .target-node-info {
+            color: #d32f2f;
+            font-weight: bold;
+            text-decoration: underline;
+        }
+    </style>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const katexOptions = {
+        delimiters: [
+            {left: '\\[', right: '\\]', display: true},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false}
+        ],
+        throwOnError: false,
+        strict: false,
+        trust: true
+    };
+
+    let renderTimeout;
+    function safeRender() {
+        if (renderTimeout) clearTimeout(renderTimeout);
+        renderTimeout = setTimeout(() => {
+            renderMathInElement(document.body, katexOptions);
+        }, 100);
+    }
+
+    renderMathInElement(document.body, katexOptions);
+
+    const observer = new MutationObserver((mutations) => {
+        let shouldRender = false;
+        mutations.forEach((mutation) => {
+            if (mutation.target &&
+                mutation.target.className &&
+                typeof mutation.target.className === 'string' &&
+                mutation.target.className.includes('katex')) {
+                return;
+            }
+            shouldRender = true;
+        });
+
+        if (shouldRender) {
+            safeRender();
+        }
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+    });
+
+    setInterval(() => {
+        const text = document.body.innerText;
+        if (text.includes('\\(') || text.includes('$$')) {
+            safeRender();
+        }
+    }, 2000);
+});
+</script>
+</head>
+<body>
+
+<div id="game-container">
+    <!-- HUD -->
+    <div class="hud">
+        <div class="stat-card">分数: <span id="score-val">0</span></div>
+        <div class="stat-card">关卡: <span id="level-val">1</span></div>
+        <div class="stat-card">剩余节点: <span id="budget-val">0</span></div>
+    </div>
+
+    <canvas id="treeCanvas"></canvas>
+
+    <div id="hint-text" class="instruction-panel">
+        点击树枝末端或房间，添加新房间！让红色目标变成“中心节点”。
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+        <button onclick="resetLevel()" class="secondary">重置本关</button>
+        <button id="submit-btn" onclick="checkSolution()">完工检测</button>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="overlay">
+        <div class="card">
+            <h1>🌲 超级树屋设计师</h1>
+            <p>在图论中，<b>中心节点</b>是到树中所有其他节点最远距离最小的点。</p>
+            <p>你的任务：通过添加房间，让指定的<b>红色房间</b>成为整座树屋的平衡中心！</p>
+            <button onclick="startGame()" style="width: 100%; font-size: 1.2em; margin-top: 20px;">开始设计</button>
+        </div>
+    </div>
+
+    <!-- Success Screen -->
+    <div id="success-screen" class="overlay hidden">
+        <div class="card">
+            <h2 id="result-title">设计完美！</h2>
+            <p id="result-msg">红色房间现在是树屋的中心了。</p>
+            <div id="achievements-list"></div>
+            <button onclick="nextLevel()" style="width: 100%; margin-top: 20px;">下一关</button>
+        </div>
+    </div>
+</div>
+
+<script type="application/json" id="widget-config">
+{
+  "type": "game",
+  "gameType": "puzzle",
+  "scoring": {
+    "correctPoints": 10,
+    "speedBonus": 5
+  }
+}
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const canvas = document.getElementById('treeCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Game State
+    let state = {
+        level: 1,
+        score: 0,
+        nodes: [],
+        edges: [],
+        targetNodeId: null,
+        budget: 0,
+        gameActive: false,
+        startTime: 0,
+        highScore: localStorage.getItem('treehouse_highscore') || 0
+    };
+
+    // Constants
+    const NODE_RADIUS = 22;
+    const SPRING_LENGTH = 80;
+    const K = 0.05; // spring constant
+    const REPULSION = 1000;
+    const DAMPING = 0.85;
+
+    // Levels Config
+    const levels = [
+        { initialNodes: 3, budget: 2, targetIdx: 0, desc: "让末端的房间变成中心。" },
+        { initialNodes: 5, budget: 3, targetIdx: 0, desc: "结构更复杂了，平衡它！" },
+        { initialNodes: 4, budget: 4, targetIdx: 3, desc: "挑战：将最偏远的角落变成中心。" },
+        { initialNodes: 6, budget: 3, targetIdx: 2, desc: "策略布局，最少步数达成平衡。" }
+    ];
+
+    function resize() {
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = canvas.parentElement.clientHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Global access for buttons
+    window.startGame = () => {
+        document.getElementById('start-screen').classList.add('hidden');
+        state.gameActive = true;
+        initLevel(1);
+        requestAnimationFrame(gameLoop);
+    };
+
+    window.resetLevel = () => {
+        initLevel(state.level);
+    };
+
+    window.nextLevel = () => {
+        document.getElementById('success-screen').classList.add('hidden');
+        state.level++;
+        if (state.level > levels.length) {
+            alert("恭喜！你已成为首席树屋架构师！");
+            state.level = 1;
+            state.score = 0;
+        }
+        initLevel(state.level);
+    };
+
+    function initLevel(levelNum) {
+        const config = levels[levelNum - 1] || levels[levels.length - 1];
+        state.nodes = [];
+        state.edges = [];
+        state.budget = config.budget;
+        state.startTime = Date.now();
+        
+        // Create initial chain or structure
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        
+        for (let i = 0; i < config.initialNodes; i++) {
+            state.nodes.push({
+                id: i,
+                x: centerX + (i - config.initialNodes/2) * 60,
+                y: centerY + Math.sin(i) * 30,
+                vx: 0, vy: 0,
+                isTarget: false
+            });
+            if (i > 0) {
+                state.edges.push({ u: i-1, v: i });
+            }
+        }
+        
+        state.targetNodeId = config.targetIdx;
+        state.nodes[state.targetNodeId].isTarget = true;
+        
+        updateUI();
+        document.getElementById('hint-text').innerText = config.desc;
+    }
+
+    function updateUI() {
+        document.getElementById('score-val').innerText = state.score;
+        document.getElementById('level-val').innerText = state.level;
+        document.getElementById('budget-val').innerText = state.budget;
+    }
+
+    // Physics Loop
+    function updatePhysics() {
+        // Repulsion
+        for (let i = 0; i < state.nodes.length; i++) {
+            for (let j = i + 1; j < state.nodes.length; j++) {
+                const dx = state.nodes[i].x - state.nodes[j].x;
+                const dy = state.nodes[i].y - state.nodes[j].y;
+                const distSq = dx * dx + dy * dy || 1;
+                const force = REPULSION / distSq;
+                const fx = (dx / Math.sqrt(distSq)) * force;
+                const fy = (dy / Math.sqrt(distSq)) * force;
+                state.nodes[i].vx += fx;
+                state.nodes[i].vy += fy;
+                state.nodes[j].vx -= fx;
+                state.nodes[j].vy -= fy;
+            }
+        }
+
+        // Attraction (Springs)
+        state.edges.forEach(edge => {
+            const u = state.nodes.find(n => n.id === edge.u);
+            const v = state.nodes.find(n => n.id === edge.v);
+            if (!u || !v) return;
+            const dx = v.x - u.x;
+            const dy = v.y - u.y;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const force = (dist - SPRING_LENGTH) * K;
+            const fx = (dx / dist) * force;
+            const fy = (dy / dist) * force;
+            u.vx += fx; u.vy += fy;
+            v.vx -= fx; v.vy -= fy;
+        });
+
+        // Center attraction
+        state.nodes.forEach(n => {
+            const dx = canvas.width / 2 - n.x;
+            const dy = canvas.height / 2 - n.y;
+            n.vx += dx * 0.005;
+            n.vy += dy * 0.005;
+
+            // Apply damping and update pos
+            n.vx *= DAMPING;
+            n.vy *= DAMPING;
+            n.x += n.vx;
+            n.y += n.vy;
+
+            // Constrain
+            const margin = 50;
+            n.x = Math.max(margin, Math.min(canvas.width - margin, n.x));
+            n.y = Math.max(margin, Math.min(canvas.height - 200, n.y));
+        });
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw Edges (Ladders/Branches)
+        ctx.strokeStyle = '#8D6E63';
+        ctx.lineWidth = 8;
+        state.edges.forEach(edge => {
+            const u = state.nodes.find(n => n.id === edge.u);
+            const v = state.nodes.find(n => n.id === edge.v);
+            ctx.beginPath();
+            ctx.moveTo(u.x, u.y);
+            ctx.lineTo(v.x, v.y);
+            ctx.stroke();
+            
+            // Ladder rungs
+            ctx.strokeStyle = '#5D4037';
+            ctx.lineWidth = 2;
+            const steps = 4;
+            for(let i=1; i<steps; i++) {
+                const rx = u.x + (v.x - u.x) * (i/steps);
+                const ry = u.y + (v.y - u.y) * (i/steps);
+                const dx = v.x - u.x;
+                const dy = v.y - u.y;
+                const nx = -dy / Math.sqrt(dx*dx+dy*dy) * 6;
+                const ny = dx / Math.sqrt(dx*dx+dy*dy) * 6;
+                ctx.beginPath();
+                ctx.moveTo(rx - nx, ry - ny);
+                ctx.lineTo(rx + nx, ry + ny);
+                ctx.stroke();
+            }
+            ctx.strokeStyle = '#8D6E63';
+            ctx.lineWidth = 8;
+        });
+
+        // Draw Nodes (Rooms)
+        state.nodes.forEach(node => {
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.1)';
+            ctx.beginPath();
+            ctx.arc(node.x, node.y + 4, NODE_RADIUS, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Room Body
+            const isTarget = node.id === state.targetNodeId;
+            ctx.fillStyle = isTarget ? '#ef5350' : '#8BC34A';
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, NODE_RADIUS, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Details
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.beginPath();
+            ctx.arc(node.x - 6, node.y - 6, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // If it's currently a center node, highlight it
+            if (node.isCurrentCenter) {
+                ctx.strokeStyle = varColor('--accent-gold');
+                ctx.lineWidth = 4;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, NODE_RADIUS + 8, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        });
+    }
+
+    function varColor(name) {
+        return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+
+    function gameLoop() {
+        if (!state.gameActive) return;
+        updatePhysics();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    // Interaction
+    canvas.addEventListener('mousedown', handlePointer);
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        handlePointer(e.touches[0]);
+    });
+
+    function handlePointer(e) {
+        if (!state.gameActive || state.budget <= 0) return;
+        
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // Check if clicked near a node
+        let clickedNode = null;
+        state.nodes.forEach(n => {
+            const d = Math.sqrt((n.x - x)**2 + (n.y - y)**2);
+            if (d < NODE_RADIUS + 20) clickedNode = n;
+        });
+
+        if (clickedNode) {
+            const newNodeId = Math.max(...state.nodes.map(n => n.id)) + 1;
+            state.nodes.push({
+                id: newNodeId,
+                x: x + (Math.random() - 0.5) * 20,
+                y: y + (Math.random() - 0.5) * 20,
+                vx: 0, vy: 0,
+                isTarget: false
+            });
+            state.edges.push({ u: clickedNode.id, v: newNodeId });
+            state.budget--;
+            updateUI();
+            
+            // Visual feedback for click
+            createParticles(x, y);
+            
+            // Live update center status
+            calculateCenters();
+        }
+    }
+
+    function createParticles(x, y) {
+        // Simple visual pop would go here
+    }
+
+    // Graph Algorithm: Find the center of the tree
+    function calculateCenters() {
+        if (state.nodes.length === 0) return [];
+        
+        const dists = {};
+        const nodeIds = state.nodes.map(n => n.id);
+        
+        // Build adjacency list
+        const adj = {};
+        nodeIds.forEach(id => adj[id] = []);
+        state.edges.forEach(e => {
+            adj[e.u].push(e.v);
+            adj[e.v].push(e.u);
+        });
+
+        const eccentricities = {};
+        let minEcc = Infinity;
+
+        nodeIds.forEach(startNode => {
+            // BFS to find max distance from this node
+            const q = [[startNode, 0]];
+            const visited = new Set([startNode]);
+            let maxD = 0;
+
+            while(q.length > 0) {
+                const [curr, d] = q.shift();
+                maxD = Math.max(maxD, d);
+                adj[curr].forEach(neighbor => {
+                    if (!visited.has(neighbor)) {
+                        visited.add(neighbor);
+                        q.push([neighbor, d + 1]);
+                    }
+                });
+            }
+            eccentricities[startNode] = maxD;
+            minEcc = Math.min(minEcc, maxD);
+        });
+
+        const centers = nodeIds.filter(id => eccentricities[id] === minEcc);
+        
+        // Update visual state
+        state.nodes.forEach(n => {
+            n.isCurrentCenter = centers.includes(n.id);
+        });
+
+        return centers;
+    }
+
+    window.checkSolution = () => {
+        const centers = calculateCenters();
+        const isSuccess = centers.includes(state.targetNodeId);
+
+        if (isSuccess) {
+            const timeTaken = (Date.now() - state.startTime) / 1000;
+            let points = 10;
+            let bonus = Math.max(0, Math.floor(10 - timeTaken / 5));
+            state.score += (points + bonus);
+            
+            document.getElementById('result-title').innerText = "设计精湛！";
+            document.getElementById('result-msg').innerText = `红色房间现在是树屋的平衡重心了！\n得分: ${points} + 奖励: ${bonus}`;
+            
+            const list = document.getElementById('achievements-list');
+            list.innerHTML = '';
+            if (bonus > 5) list.innerHTML += '<span class="achievement">⚡ 神速设计师</span>';
+            if (state.budget > 0) list.innerHTML += '<span class="achievement">💰 节省能手</span>';
+            
+            document.getElementById('success-screen').classList.remove('hidden');
+        } else {
+            const hint = document.getElementById('hint-text');
+            hint.innerText = "还不是中心！尝试在更短的分支末端添加房间来平衡。";
+            hint.style.color = 'red';
+            setTimeout(() => {
+                hint.style.color = '';
+            }, 1000);
+        }
+    };
+});
+</script>
+</body>
+</html>

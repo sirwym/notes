@@ -4,36 +4,24 @@
 
 ---
 
-## 一、导航栏（必须）
+## 一、导航栏（不需要）
 
-每个动画/游戏页面**必须**包含统一的顶部导航栏，紧贴 `<body>` 标签之后插入：
+动画和游戏页面**不需要导航栏**。用户通过浏览器后退按钮返回首页。
 
-```html
-<!-- 统一导航栏 -->
-<nav style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fff;border-bottom:1px solid #e5e7eb;height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;">
-    <a href="../index.html" style="display:flex;align-items:center;gap:6px;text-decoration:none;color:#6b7280;font-size:13px;transition:color 0.2s;" onmouseover="this.style.color='#2563eb'" onmouseout="this.style.color='#6b7280'">
-        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-        返回首页
-    </a>
-    <span style="font-size:12px;color:#9ca3af;">王老师的课堂笔记</span>
-</nav>
-```
-
-导航栏为 inline style，不依赖任何外部 CSS 框架。
+动画/游戏通常是全屏交互体验，导航栏会占用空间且干扰沉浸感。
 
 ---
 
-## 二、Body 偏移（必须）
+## 二、Body 布局
 
-导航栏高度 48px、fixed 定位，因此 body 必须偏移：
+动画/游戏页面通常全屏显示，body 样式：
 
 | 场景 | 写法 |
 |------|------|
-| 一般页面 | `body { margin-top: 48px; }` |
-| 全屏容器页面（100vh） | `body { margin-top: 48px; height: calc(100vh - 48px); }` |
-| 使用 Tailwind 的页面 | 直接在 `<body>` 加 `style="margin-top:48px;height:calc(100vh - 48px);"` |
+| Canvas 全屏 | `body { margin: 0; overflow: hidden; height: 100vh; }` |
+| 游戏容器居中 | `body { margin: 0; display: flex; height: 100vh; }` |
 
-**原则：页面内容不能被导航栏遮挡。**
+**不需要 margin-top 偏移（没有导航栏）。**
 
 ---
 
@@ -45,12 +33,6 @@
 | 主色深 | `#1d4ed8` | `--primary-dark: #1d4ed8` |
 
 **禁止使用紫色**（`#8b5cf6`、`#7c3aed`）或其他非品牌色作为主色。
-
-Tailwind class 映射：
-- `bg-brand-600` / `bg-brand-700` 代替 `bg-purple-600` / `bg-blue-600`
-- `text-brand-600` 代替 `text-purple-600`
-- `focus:ring-brand-500` 代替 `focus:ring-purple-500`
-- `hover:border-brand-300` 用于边框高亮
 
 Canvas/JS 中硬编码颜色也必须用 `#2563eb`，不要用紫色。
 
@@ -126,8 +108,9 @@ topic: GESP级别 或 知识点名称
 | `game` | 知识点游戏（放 `games/` 目录） |
 
 ### topic 取值
-- GESP 级别：`GESP1` ~ `GESP8`
-- 或知识点名称：如 `取余与取模`、`条件嵌套`、`整除与进一`
+- **动画和游戏**：使用知识点名称（如 `取余与取模`、`条件嵌套`、`树的中心`、`输入输出流`）
+- **C++ 模板**：使用 GESP 级别（`GESP1` ~ `GESP8`）
+- ⚠️ 动画和游戏的 topic 和 tags 中**不要出现 GESP 等级标签**（如 `GESP1`、`GESP6`），只用知识点关键词
 
 ### 示例
 ```markdown
@@ -135,8 +118,8 @@ topic: GESP级别 或 知识点名称
 title: cin 数据传送带
 category: animation
 subtitle: 模拟 cin 输入流的工作方式，理解数据如何传入变量
-tags: cin 输入 传送带 流 GESP1
-topic: GESP1
+tags: cin 输入 传送带 流
+topic: 输入输出流
 ---
 ```
 
@@ -167,11 +150,10 @@ python3 build.py
 
 修改或新增动画/游戏时，逐项确认：
 
-- [ ] 有统一导航栏（48px fixed，返回首页链接）
-- [ ] body 有 margin-top: 48px 偏移
-- [ ] 全屏页面 height 用 calc(100vh - 48px)
 - [ ] 主色为 #2563eb（品牌蓝），无紫色
 - [ ] 无 CDN 引用，全部使用本地 `../assets/` 资源
 - [ ] 页面标题带 ` - 王老师的课堂笔记` 后缀
 - [ ] 有对应的 `.meta.md` 元数据文件
+- [ ] 无导航栏（用户用浏览器后退）
+- [ ] body 无 margin-top 偏移，全屏页面用 `height: 100vh`
 - [ ] 运行 `python3 build.py` 重新构建

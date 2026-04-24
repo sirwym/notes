@@ -100,6 +100,31 @@ def render_tags_detail(tags_str):
     
     return "\n                ".join(html_parts)
 
+# ===== 数学公式保护 =====
+def protect_math(text):
+    """在 Markdown 转换前，将 $...$ 和 $$...$$ 替换为占位符，防止被 Markdown 引擎破坏"""
+    placeholders = {}
+    counter = [0]
+    
+    def make_placeholder(match):
+        key = f"MATHPLACEHOLDER{counter[0]}END"
+        counter[0] += 1
+        placeholders[key] = match.group(0)
+        return key
+    
+    # 先处理 $$...$$（display math），再处理 $...$（inline math）
+    # 顺序很重要，先匹配长的避免短匹配截断
+    text = re.sub(r'\$\$(.+?)\$\$', make_placeholder, text, flags=re.DOTALL)
+    text = re.sub(r'\$([^\$\n]+?)\$', make_placeholder, text)
+    
+    return text, placeholders
+
+def restore_math(text, placeholders):
+    """将占位符还原为原始数学公式"""
+    for key, value in placeholders.items():
+        text = text.replace(key, value)
+    return text
+
 # ===== iframe 短语法处理 =====
 def process_iframe_shortcuts(text):
     """将 !!animation xxx.html!! 替换为完整 iframe 标签"""
@@ -131,8 +156,14 @@ def build_cpp_file(md_path, template_html):
     
     body = process_iframe_shortcuts(body)
     
+    # 保护数学公式，避免被 Markdown 引擎破坏
+    body, math_placeholders = protect_math(body)
+    
     md = markdown.Markdown(extensions=["fenced_code", "tables", "attr_list"])
     content_html = md.convert(body)
+    
+    # 还原数学公式
+    content_html = restore_math(content_html, math_placeholders)
     
     output = template_html
     output = output.replace("{{title}}", heading)

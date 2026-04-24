@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>寻找中心点挑战赛</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --text: #f8fafc;
+            --accent: #22d3ee;
+            --success: #22c55e;
+            --error: #ef4444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            overflow: hidden;
+            touch-action: none;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #game-container {
+            position: relative;
+            flex-grow: 1;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: crosshair;
+        }
+
+        .hud {
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .stat-card {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(8px);
+            padding: 10px 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-value { font-size: 24px; font-weight: bold; color: var(--accent); }
+        .stat-label { font-size: 12px; opacity: 0.8; text-transform: uppercase; }
+
+        .overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .hidden { display: none !important; }
+
+        h1 { font-size: 2.5rem; margin-bottom: 1rem; color: var(--accent); }
+        p { margin-bottom: 2rem; max-width: 400px; line-height: 1.6; }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 16px 40px;
+            font-size: 1.25rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 20px rgba(79, 70, 229, 0.4);
+        }
+
+        .btn:hover { background: var(--primary-hover); transform: translateY(-2px); }
+        .btn:active { transform: translateY(0); }
+
+        .achievement-popup {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--success);
+            padding: 12px 24px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 50;
+        }
+
+        .achievement-popup.show { transform: translateX(-50%) translateY(0); }
+
+        .timer-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 6px;
+            background: var(--accent);
+            width: 100%;
+            transition: width 0.1s linear;
+        }
+
+        .instruction {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            margin-top: 1rem;
+        }
+
+        #feedback-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3rem;
+            font-weight: 900;
+            pointer-events: none;
+            opacity: 0;
+            z-index: 20;
+        }
+    </style>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const katexOptions = {
+        delimiters: [
+            {left: '\\[', right: '\\]', display: true},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false}
+        ],
+        throwOnError: false,
+        strict: false,
+        trust: true
+    };
+
+    let renderTimeout;
+    function safeRender() {
+        if (renderTimeout) clearTimeout(renderTimeout);
+        renderTimeout = setTimeout(() => {
+            renderMathInElement(document.body, katexOptions);
+        }, 100);
+    }
+
+    renderMathInElement(document.body, katexOptions);
+
+    const observer = new MutationObserver((mutations) => {
+        let shouldRender = false;
+        mutations.forEach((mutation) => {
+            if (mutation.target &&
+                mutation.target.className &&
+                typeof mutation.target.className === 'string' &&
+                mutation.target.className.includes('katex')) {
+                return;
+            }
+            shouldRender = true;
+        });
+
+        if (shouldRender) {
+            safeRender();
+        }
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+    });
+
+    setInterval(() => {
+        const text = document.body.innerText;
+        if (text.includes('\\(') || text.includes('$$')) {
+            safeRender();
+        }
+    }, 2000);
+});
+</script>
+</head>
+<body>
+
+<div id="game-container">
+    <!-- HUD -->
+    <div class="hud">
+        <div class="stat-card">
+            <span class="stat-value" id="score-val">0</span>
+            <span class="stat-label">积分</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value" id="level-val">1</span>
+            <span class="stat-label">关卡</span>
+        </div>
+    </div>
+
+    <!-- Feedback Layer -->
+    <div id="feedback-text"></div>
+
+    <!-- Canvas -->
+    <canvas id="gameCanvas"></canvas>
+    <div class="timer-bar" id="timer-bar"></div>
+
+    <!-- Overlays -->
+    <div id="start-screen" class="overlay">
+        <h1>寻找树心</h1>
+        <p>复杂的结构中总有一个“核心节点”，它到所有其他点的最远距离是最小的。你能一眼发现它吗？</p>
+        <button class="btn" onclick="startGame()">开始挑战</button>
+        <div class="instruction">提示：观察最长的路径，中心就在路径的中点！</div>
+    </div>
+
+    <div id="game-over-screen" class="overlay hidden">
+        <h1 id="result-title">挑战结束</h1>
+        <p>最终得分: <span id="final-score" style="font-size: 2rem; color: var(--accent);">0</span></p>
+        <p id="high-score-text"></p>
+        <button class="btn" onclick="startGame()">再来一次</button>
+    </div>
+
+    <!-- Achievement Toast -->
+    <div id="achievement" class="achievement-popup">
+        <span id="ach-icon">🏆</span>
+        <span id="ach-text">达成成就！</span>
+    </div>
+</div>
+
+<script type="application/json" id="widget-config">
+{
+  "type": "game",
+  "gameType": "action",
+  "scoring": {
+    "correctPoints": 10,
+    "speedBonus": 5
+  }
+}
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreVal = document.getElementById('score-val');
+    const levelVal = document.getElementById('level-val');
+    const timerBar = document.getElementById('timer-bar');
+    const startScreen = document.getElementById('start-screen');
+    const gameOverScreen = document.getElementById('game-over-screen');
+    const finalScoreDisplay = document.getElementById('final-score');
+    const feedbackText = document.getElementById('feedback-text');
+    const achievementToast = document.getElementById('achievement');
+
+    // Game Constants
+    const COLORS = {
+        node: '#cbd5e1',
+        edge: '#475569',
+        target: '#22d3ee',
+        correct: '#22c55e',
+        wrong: '#ef4444'
+    };
+    const NODE_RADIUS = 18;
+    const TIME_LIMIT = 8000; // 8 seconds per round
+
+    // Game State
+    let state = {
+        active: false,
+        score: 0,
+        level: 1,
+        nodes: [],
+        edges: [],
+        centers: [],
+        lastFrame: 0,
+        timeLeft: 0,
+        particles: [],
+        highScore: localStorage.getItem('tree_center_highscore') || 0,
+        achievements: new Set()
+    };
+
+    function resize() {
+        const container = canvas.parentElement;
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Global Exposure
+    window.startGame = function() {
+        state.active = true;
+        state.score = 0;
+        state.level = 1;
+        state.achievements.clear();
+        scoreVal.textContent = '0';
+        levelVal.textContent = '1';
+        startScreen.classList.add('hidden');
+        gameOverScreen.classList.add('hidden');
+        nextLevel();
+        requestAnimationFrame(gameLoop);
+    };
+
+    function nextLevel() {
+        state.particles = [];
+        const nodeCount = 5 + Math.min(Math.floor(state.level / 2), 15);
+        generateRandomTree(nodeCount);
+        state.timeLeft = Math.max(8000 - state.level * 200, 3000); // Decelerating difficulty
+        levelVal.textContent = state.level;
+    }
+
+    function generateRandomTree(n) {
+        state.nodes = [];
+        state.edges = [];
+        
+        // 1. Generate nodes
+        for (let i = 0; i < n; i++) {
+            state.nodes.push({
+                id: i,
+                x: canvas.width * 0.2 + Math.random() * canvas.width * 0.6,
+                y: canvas.height * 0.3 + Math.random() * canvas.height * 0.4,
+                vx: 0, vy: 0,
+                radius: NODE_RADIUS,
+                pulse: 0
+            });
+        }
+
+        // 2. Random tree connections (Prufer-like or simple random parent)
+        for (let i = 1; i < n; i++) {
+            const parentId = Math.floor(Math.random() * i);
+            state.edges.push({ u: i, v: parentId });
+        }
+
+        // 3. Find Tree Centers
+        state.centers = findTreeCenters(n, state.edges);
+        
+        // 4. Run simple force layout for a few steps to clean up
+        for (let i = 0; i < 200; i++) applyPhysics();
+    }
+
+    function findTreeCenters(n, edges) {
+        const adj = Array.from({ length: n }, () => []);
+        edges.forEach(({ u, v }) => {
+            adj[u].push(v);
+            adj[v].push(u);
+        });
+
+        const eccentricities = new Array(n).fill(0);
+        
+        for (let i = 0; i < n; i++) {
+            const dists = new Array(n).fill(-1);
+            const queue = [i];
+            dists[i] = 0;
+            let maxDist = 0;
+            
+            while (queue.length > 0) {
+                const u = queue.shift();
+                maxDist = Math.max(maxDist, dists[u]);
+                for (const v of adj[u]) {
+                    if (dists[v] === -1) {
+                        dists[v] = dists[u] + 1;
+                        queue.push(v);
+                    }
+                }
+            }
+            eccentricities[i] = maxDist;
+        }
+
+        const minEcc = Math.min(...eccentricities);
+        const centers = [];
+        eccentricities.forEach((ecc, id) => {
+            if (ecc === minEcc) centers.push(id);
+        });
+        return centers;
+    }
+
+    function applyPhysics() {
+        const k = 0.05; // Spring constant
+        const repulse = 1500; // Repulsion
+        
+        // Repulsion
+        for (let i = 0; i < state.nodes.length; i++) {
+            for (let j = i + 1; j < state.nodes.length; j++) {
+                const dx = state.nodes[i].x - state.nodes[j].x;
+                const dy = state.nodes[i].y - state.nodes[j].y;
+                const distSq = dx * dx + dy * dy || 1;
+                const force = repulse / distSq;
+                const fx = (dx / Math.sqrt(distSq)) * force;
+                const fy = (dy / Math.sqrt(distSq)) * force;
+                state.nodes[i].vx += fx;
+                state.nodes[i].vy += fy;
+                state.nodes[j].vx -= fx;
+                state.nodes[j].vy -= fy;
+            }
+        }
+
+        // Attraction
+        state.edges.forEach(({ u, v }) => {
+            const n1 = state.nodes[u];
+            const n2 = state.nodes[v];
+            const dx = n2.x - n1.x;
+            const dy = n2.y - n1.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const force = (dist - 80) * k;
+            const fx = (dx / dist) * force;
+            const fy = (dy / dist) * force;
+            n1.vx += fx;
+            n1.vy += fy;
+            n2.vx -= fx;
+            n2.vy -= fy;
+        });
+
+        // Center force & Dampening
+        state.nodes.forEach(n => {
+            n.vx += (canvas.width / 2 - n.x) * 0.005;
+            n.vy += (canvas.height / 2 - n.y) * 0.005;
+            n.x += n.vx;
+            n.y += n.vy;
+            n.vx *= 0.8;
+            n.vy *= 0.8;
+            
+            // Keep in bounds
+            const margin = 50;
+            n.x = Math.max(margin, Math.min(canvas.width - margin, n.x));
+            n.y = Math.max(margin + 60, Math.min(canvas.height - margin - 60, n.y));
+        });
+    }
+
+    function gameLoop(time) {
+        if (!state.active) return;
+        const dt = time - state.lastFrame;
+        state.lastFrame = time;
+
+        // Update timer
+        state.timeLeft -= dt;
+        const progress = Math.max(0, state.timeLeft / (8000 - state.level * 200) * 100);
+        timerBar.style.width = progress + '%';
+        if (progress < 30) timerBar.style.backgroundColor = COLORS.wrong;
+        else timerBar.style.backgroundColor = COLORS.accent;
+
+        if (state.timeLeft <= 0) {
+            endGame();
+            return;
+        }
+
+        // Physics
+        applyPhysics();
+
+        // Draw
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw Edges
+        ctx.strokeStyle = COLORS.edge;
+        ctx.lineWidth = 3;
+        state.edges.forEach(({ u, v }) => {
+            ctx.beginPath();
+            ctx.moveTo(state.nodes[u].x, state.nodes[u].y);
+            ctx.lineTo(state.nodes[v].x, state.nodes[v].y);
+            ctx.stroke();
+        });
+
+        // Draw Nodes
+        state.nodes.forEach(n => {
+            n.pulse += 0.05;
+            const pulseSize = Math.sin(n.pulse) * 2;
+            
+            // Outer glow for all nodes
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = 'rgba(255,255,255,0.1)';
+            
+            ctx.fillStyle = COLORS.node;
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, n.radius + pulseSize, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        });
+
+        // Particles
+        updateParticles();
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    function updateParticles() {
+        for (let i = state.particles.length - 1; i >= 0; i--) {
+            const p = state.particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= 0.02;
+            if (p.life <= 0) {
+                state.particles.splice(i, 1);
+                continue;
+            }
+            ctx.fillStyle = `rgba(${p.color}, ${p.life})`;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    function spawnParticles(x, y, colorStr) {
+        for (let i = 0; i < 15; i++) {
+            state.particles.push({
+                x, y,
+                vx: (Math.random() - 0.5) * 10,
+                vy: (Math.random() - 0.5) * 10,
+                life: 1.0,
+                size: Math.random() * 4 + 2,
+                color: colorStr
+            });
+        }
+    }
+
+    function showFeedback(text, color) {
+        feedbackText.textContent = text;
+        feedbackText.style.color = color;
+        feedbackText.style.opacity = '1';
+        feedbackText.style.transform = 'translate(-50%, -50%) scale(1.5)';
+        feedbackText.style.transition = 'none';
+        
+        setTimeout(() => {
+            feedbackText.style.transition = 'all 0.5s ease-out';
+            feedbackText.style.opacity = '0';
+            feedbackText.style.transform = 'translate(-50%, -100%) scale(1)';
+        }, 100);
+    }
+
+    function handleInteraction(clientX, clientY) {
+        if (!state.active) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+
+        let clickedNode = null;
+        state.nodes.forEach(n => {
+            const dist = Math.sqrt((n.x - x) ** 2 + (n.y - y) ** 2);
+            if (dist < n.radius + 15) clickedNode = n;
+        });
+
+        if (clickedNode !== null) {
+            if (state.centers.includes(clickedNode.id)) {
+                // Correct
+                const speedBonus = Math.floor((state.timeLeft / 8000) * 5);
+                const points = 10 + speedBonus;
+                state.score += points;
+                scoreVal.textContent = state.score;
+                spawnParticles(clickedNode.x, clickedNode.y, "34, 197, 94");
+                showFeedback(`+${points}`, COLORS.correct);
+                
+                checkAchievements();
+                state.level++;
+                nextLevel();
+            } else {
+                // Wrong
+                spawnParticles(clickedNode.x, clickedNode.y, "239, 68, 108");
+                showFeedback("错了！", COLORS.wrong);
+                state.timeLeft -= 1500; // Time penalty
+            }
+        }
+    }
+
+    function checkAchievements() {
+        if (state.level === 5 && !state.achievements.has('scout')) {
+            showAchievement("🔭 洞察入微", "完成第5关！");
+            state.achievements.add('scout');
+        }
+        if (state.level === 10 && !state.achievements.has('master')) {
+            showAchievement("🎓 树学大师", "发现10个中心点！");
+            state.achievements.add('master');
+        }
+    }
+
+    function showAchievement(title, desc) {
+        document.getElementById('ach-icon').textContent = title.split(' ')[0];
+        document.getElementById('ach-text').textContent = title.split(' ')[1] + ": " + desc;
+        achievementToast.classList.add('show');
+        setTimeout(() => achievementToast.classList.remove('show'), 3000);
+    }
+
+    function endGame() {
+        state.active = false;
+        gameOverScreen.classList.remove('hidden');
+        finalScoreDisplay.textContent = state.score;
+        
+        if (state.score > state.highScore) {
+            state.highScore = state.score;
+            localStorage.setItem('tree_center_highscore', state.score);
+            document.getElementById('high-score-text').textContent = "🎉 创纪录了！最高分更新！";
+        } else {
+            document.getElementById('high-score-text').textContent = `最高纪录: ${state.highScore}`;
+        }
+    }
+
+    canvas.addEventListener('mousedown', (e) => handleInteraction(e.clientX, e.clientY));
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        handleInteraction(e.touches[0].clientX, e.touches[0].clientY);
+    });
+});
+</script>
+</body>
+</html>
