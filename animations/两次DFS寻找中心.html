@@ -6,45 +6,45 @@
     <title>两次 DFS 求树的中心 - 王老师的课堂笔记</title>
     <script src="../assets/js/tailwind.js"></script>
     <style>
-        :root { --primary: #2563eb; --primary-dark: #1d4ed8; --bg-canvas: #0f172a; }
-        body { margin:0; overflow:hidden; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:#1e293b; color:white; touch-action:manipulation; height:100vh; }
-        canvas { display:block; width:100%; height:100%; background:var(--bg-canvas); }
-        .control-panel { background:rgba(30,41,59,0.9); backdrop-filter:blur(8px); border-bottom:1px solid rgba(255,255,255,0.1); z-index:50; }
-        @media(min-width:768px) { .control-panel { width:320px; height:100%; border-bottom:none; border-right:1px solid rgba(255,255,255,0.1); } }
+        :root { --primary: #2563eb; --primary-dark: #1d4ed8; --bg: #f8fafc; }
+        body { margin:0; overflow:hidden; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background-color:var(--bg); touch-action:manipulation; height:100vh; }
+        canvas { display:block; width:100%; height:100%; background-color:#ffffff; }
+        .control-panel { background:#ffffff; border-bottom:1px solid #e2e8f0; z-index:50; box-shadow:0 4px 6px -1px rgb(0 0 0/0.1); }
+        @media(min-width:768px) { .control-panel { width:320px; height:100%; border-bottom:none; border-right:1px solid #e2e8f0; } }
         input[type=range] { height:38px; -webkit-appearance:none; width:100%; background:transparent; }
         input[type=range]:focus { outline:none; }
-        input[type=range]::-webkit-slider-runnable-track { width:100%; height:8px; cursor:pointer; background:#334155; border-radius:4px; }
-        input[type=range]::-webkit-slider-thumb { height:24px; width:24px; border-radius:50%; background:var(--primary); cursor:pointer; -webkit-appearance:none; margin-top:-8px; box-shadow:0 0 10px rgba(37,99,235,0.5); }
+        input[type=range]::-webkit-slider-runnable-track { width:100%; height:8px; cursor:pointer; background:#e2e8f0; border-radius:4px; }
+        input[type=range]::-webkit-slider-thumb { height:24px; width:24px; border-radius:50%; background:var(--primary); cursor:pointer; -webkit-appearance:none; margin-top:-8px; }
         .btn-primary { background-color:var(--primary); transition:all 0.2s; min-height:44px; }
         .btn-primary:hover { background-color:var(--primary-dark); transform:translateY(-1px); }
         .btn-primary:active { transform:translateY(0); }
-        .status-badge { padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600; }
+        .status-badge { padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600; color:#fff; }
         .status-running { background:#10b981; } .status-paused { background:#f59e0b; } .status-ended { background:#2563eb; }
-        #message-box { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(15,23,42,0.85); padding:12px 24px; border-radius:12px; border:1px solid rgba(37,99,235,0.3); text-align:center; max-width:90%; pointer-events:none; transition:all 0.3s; }
+        #message-box { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.95); padding:12px 24px; border-radius:12px; border:1px solid #e2e8f0; text-align:center; max-width:90%; pointer-events:none; transition:all 0.3s; color:#1e293b; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
     </style>
 </head>
 <body class="flex flex-col md:flex-row">
 
 <div id="controls" class="control-panel flex flex-col p-4 shrink-0 overflow-y-auto max-h-[50vh] md:max-h-screen">
     <div class="mb-5">
-        <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400">树的中心：两次 DFS</h1>
-        <p class="text-slate-400 text-sm mt-1">先找直径，再取中点</p>
+        <h1 class="text-xl font-bold text-slate-800">树的中心：两次 DFS</h1>
+        <p class="text-slate-500 text-sm mt-1">先找直径，再取中点</p>
     </div>
     <div class="space-y-5">
         <div>
             <div class="flex justify-between mb-2">
-                <label class="text-sm font-medium">演示速度</label>
-                <span id="speed-display" class="text-primary font-mono font-bold">1.5x</span>
+                <label class="text-sm font-medium text-slate-700">演示速度</label>
+                <span id="speed-display" class="text-blue-600 font-mono font-bold">1.5x</span>
             </div>
             <input type="range" id="speed-slider" min="0.5" max="3" step="0.1" value="1.5">
         </div>
         <div class="pt-3 flex flex-col gap-3">
             <button id="main-btn" class="btn-primary w-full rounded-lg font-bold text-white shadow-lg">启动演示</button>
-            <button id="reset-btn" class="w-full py-2 rounded-lg font-medium text-slate-300 border border-slate-600 hover:bg-slate-700 transition-colors">重置（新树）</button>
+            <button id="reset-btn" class="w-full py-2 rounded-lg font-medium text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors">重置（新树）</button>
         </div>
-        <div class="mt-3 bg-slate-800/50 p-3 rounded-lg border border-slate-700">
+        <div class="mt-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
             <h3 class="text-xs uppercase tracking-wider text-slate-500 font-bold mb-2">阶段说明</h3>
-            <div class="text-sm space-y-2 text-slate-300">
+            <div class="text-sm space-y-2 text-slate-600">
                 <div id="phase-1" class="flex items-center gap-2 opacity-50"><span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>DFS 1: 找直径端点 s</span></div>
                 <div id="phase-2" class="flex items-center gap-2 opacity-50"><span class="w-2 h-2 rounded-full bg-blue-500"></span><span>DFS 2: 从 s 找端点 e</span></div>
                 <div id="phase-3" class="flex items-center gap-2 opacity-50"><span class="w-2 h-2 rounded-full bg-amber-500"></span><span>回溯路径，找中心</span></div>
@@ -53,25 +53,25 @@
     </div>
 </div>
 
-<div class="flex-1 relative min-h-[400px]">
+<div class="flex-1 relative min-h-[400px] bg-white">
     <canvas id="canvas"></canvas>
     <div id="message-box" class="opacity-0">准备就绪</div>
     <div class="absolute top-4 right-4 flex flex-col gap-2 pointer-events-none">
-        <div id="status-tag" class="status-badge bg-slate-700 self-end">就绪</div>
+        <div id="status-tag" class="status-badge bg-slate-300 self-end">就绪</div>
     </div>
 </div>
 
 <script>
 const state = {
     running:false, paused:false, ended:false,
-    phase:0, // 0:Ready, 1:DFS1, 1.5:Wait, 2:DFS2, 2.5:Wait, 3:TraceCenter
-    speed:1.5,
+    phase:0, speed:1.5,
     nodes:[], edges:[], adj:[],
     dfsStack:[], visited:new Set(), distances:{},
     maxDist:-1, targetNode:null,
     nodeS:null, nodeE:null,
-    parentMap:{}, // parent[u] = fa (from DFS2)
+    parentMap:{},
     diameterPath:[], centerNodes:[],
+    currentVisit:null,
     waitingForNext:false,
     lastStepTime:0,
 };
@@ -85,7 +85,6 @@ function generateRandomTree() {
     const n = 8 + Math.floor(Math.random() * 7);
     const adj = Array.from({length:n}, ()=>[]);
     for(let i=1;i<n;i++) { const p=Math.floor(Math.random()*i); adj[i].push(p); adj[p].push(i); }
-
     const levels=[], vis=new Set(), q=[0]; vis.add(0);
     const nodeLevel=new Array(n).fill(0);
     while(q.length>0) {
@@ -93,13 +92,12 @@ function generateRandomTree() {
         for(const u of q) { level.push(u); for(const v of adj[u]) { if(!vis.has(v)) { vis.add(v); nodeLevel[v]=nodeLevel[u]+1; next.push(v); } } }
         levels.push(level); q.length=0; q.push(...next);
     }
-    const maxL=levels.length;
-    const nodes=new Array(n);
+    const maxL=levels.length; const nodes=new Array(n);
     for(let l=0;l<levels.length;l++) {
         const row=levels[l];
         for(let i=0;i<row.length;i++) {
             const id=row[i];
-            nodes[id]={id, x:(i+1)/(row.length+1), y:(l+1)/(maxL+1), currentRadius:18, color:'#334155', dist:null, pulse:0};
+            nodes[id]={id, x:(i+1)/(row.length+1), y:(l+1)/(maxL+1), currentRadius:18, color:'#e2e8f0', dist:null, pulse:0};
         }
     }
     const edges=[];
@@ -117,7 +115,7 @@ function updateUI() {
     if(state.ended) { btn.textContent='重新开始'; tag.textContent='已完成'; tag.className='status-badge status-ended'; }
     else if(state.running) { btn.textContent='暂停'; tag.textContent='进行中...'; tag.className='status-badge status-running'; }
     else if(state.paused) { btn.textContent='继续'; tag.textContent='已暂停'; tag.className='status-badge status-paused'; }
-    else { btn.textContent='启动演示'; tag.textContent='就绪'; tag.className='status-badge bg-slate-700'; }
+    else { btn.textContent='启动演示'; tag.textContent='就绪'; tag.className='status-badge bg-slate-300'; }
     ['phase-1','phase-2','phase-3'].forEach((id,i) => {
         const el=document.getElementById(id);
         const p = state.phase===1.5?1 : state.phase===2.5?2 : state.phase;
@@ -126,26 +124,29 @@ function updateUI() {
 }
 
 function startDFS(startId) {
-    state.visited.clear();
-    state.dfsStack=[{node:startId, dist:0, parent:-1}];
-    state.visited.add(startId);
-    state.distances={[startId]:0};
-    state.maxDist=0;
-    state.targetNode=startId;
-    state.parentMap={};
-    state.nodes[startId].color='#10b981';
+    // DFS间重置：清除上一次DFS的颜色和边状态
+    if (state.phase >= 2) {
+        state.nodes.forEach(n => { n.color = '#e2e8f0'; n.dist = null; });
+        state.edges.forEach(e => { e.active = false; e.highlight = false; });
+    }
+    state.visited.clear(); state.dfsStack=[{node:startId, dist:0, parent:-1}];
+    state.visited.add(startId); state.distances={[startId]:0};
+    state.maxDist=0; state.targetNode=startId;
+    if (state.phase < 2) state.parentMap={};
+    // 起始节点着色（DFS1绿色，DFS2蓝色）
+    state.nodes[startId].color = (state.phase <= 1) ? '#10b981' : '#2563eb';
+    state.nodes[startId].dist = 0;
 }
 
 function processDFSStep() {
     if(state.dfsStack.length===0) {
+        state.currentVisit = null;
         if(state.phase===1) {
-            state.nodeS=state.targetNode;
-            state.phase=1.5; state.waitingForNext=true;
+            state.nodeS=state.targetNode; state.phase=1.5; state.waitingForNext=true;
             showMessage(`找到端点 s: 节点 ${state.nodeS}。准备第二次 DFS...`);
             setTimeout(()=>{ if(state.running){ state.waitingForNext=false; state.phase=2; startDFS(state.nodeS); showMessage('从 s 开始第二次 DFS...'); } }, 800);
         } else if(state.phase===2 && !state.waitingForNext) {
-            state.nodeE=state.targetNode;
-            state.phase=2.5; state.waitingForNext=true;
+            state.nodeE=state.targetNode; state.phase=2.5; state.waitingForNext=true;
             showMessage(`找到端点 e: 节点 ${state.nodeE}。正在回溯直径路径...`);
             setTimeout(()=>{ if(state.running){ state.waitingForNext=false; state.phase=3; traceDiameterAndCenter(); } }, 800);
         }
@@ -153,73 +154,61 @@ function processDFSStep() {
     }
     const {node, dist, parent} = state.dfsStack.pop();
     state.parentMap[node] = parent;
-
+    // 弹出时着色当前节点（体现DFS深度优先）
+    state.nodes[node].color = (state.phase===1) ? '#10b981' : '#2563eb';
+    state.nodes[node].dist = dist;
+    state.currentVisit = node;
     for(const v of state.adj[node]) {
         if(v!==parent && !state.visited.has(v)) {
-            state.visited.add(v);
-            const newDist=dist+1;
+            state.visited.add(v); const newDist=dist+1;
             state.dfsStack.push({node:v, dist:newDist, parent:node});
             state.distances[v]=newDist;
             state.edges.forEach(e=>{ if((e.u===node&&e.v===v)||(e.v===node&&e.u===v)) e.active=true; });
             if(newDist>state.maxDist) { state.maxDist=newDist; state.targetNode=v; }
-            state.nodes[v].color=(state.phase===1)?'#10b981':'#2563eb';
-            state.nodes[v].dist=newDist;
         }
     }
 }
 
 function traceDiameterAndCenter() {
-    // Backtrack from e to s using parentMap
-    const path=[];
-    let curr=state.nodeE;
+    const path=[]; let curr=state.nodeE;
     while(curr!==-1 && curr!==undefined) { path.push(curr); curr=state.parentMap[curr]; }
     state.diameterPath=path;
-
-    // Highlight diameter edges
     for(let i=0;i<path.length-1;i++) {
         const u=path[i], v=path[i+1];
         state.edges.forEach(e=>{ if((e.u===u&&e.v===v)||(e.v===u&&e.u===v)) e.highlight=true; });
     }
-
-    // Find center: diameter length L = path.length-1
-    const L=path.length-1;
-    state.centerNodes=[];
-    if(L%2===0) {
-        state.centerNodes=[path[L/2]];
-    } else {
-        state.centerNodes=[path[Math.floor(L/2)], path[Math.floor(L/2)+1]];
-    }
-
+    const L=path.length-1; state.centerNodes=[];
+    if(L%2===0) state.centerNodes=[path[L/2]];
+    else state.centerNodes=[path[Math.floor(L/2)], path[Math.floor(L/2)+1]];
     state.running=false; state.ended=true;
     const centerStr = state.centerNodes.length===1 ? `节点 ${state.centerNodes[0]}` : `节点 ${state.centerNodes[0]} 和 ${state.centerNodes[1]}`;
-    showMessage(`中心: ${centerStr}（直径长度=${L}）`);
-    updateUI();
+    showMessage(`中心: ${centerStr}（直径长度=${L}）`); updateUI();
 }
 
 function draw() {
     ctx.clearRect(0,0,canvas.width,canvas.height);
     const margin=60, w=canvas.width-margin*2, h=canvas.height-margin*2;
 
-    // Edges
     state.edges.forEach(e=>{
         const u=state.nodes[e.u], v=state.nodes[e.v];
         ctx.beginPath(); ctx.moveTo(u.x*w+margin, u.y*h+margin); ctx.lineTo(v.x*w+margin, v.y*h+margin);
-        if(e.highlight) { ctx.strokeStyle='#fbbf24'; ctx.lineWidth=8; ctx.stroke(); ctx.shadowBlur=15; ctx.shadowColor='#fbbf24'; ctx.stroke(); ctx.shadowBlur=0; }
-        else if(e.active) { ctx.strokeStyle=(state.phase<=1.5)?'#10b981':'#2563eb'; ctx.lineWidth=4; ctx.stroke(); }
-        else { ctx.strokeStyle='#334155'; ctx.lineWidth=2; ctx.stroke(); }
+        if(e.highlight) { ctx.strokeStyle='#fbbf24'; ctx.lineWidth=8; ctx.stroke(); ctx.shadowBlur=15; ctx.shadowColor='rgba(251,191,36,0.4)'; ctx.stroke(); ctx.shadowBlur=0; }
+        else if(e.active && state.phase<=1.5) { ctx.strokeStyle='#10b981'; ctx.lineWidth=4; ctx.stroke(); }
+        else if(e.active && state.phase>=2) { ctx.strokeStyle='#2563eb'; ctx.lineWidth=4; ctx.stroke(); }
+        else { ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=2; ctx.stroke(); }
     });
 
-    // Nodes
     state.nodes.forEach(n=>{
         const px=n.x*w+margin, py=n.y*h+margin;
         const isS=state.nodeS!==null&&n.id===state.nodeS;
         const isE=state.nodeE!==null&&n.id===state.nodeE;
         const isCenter=state.centerNodes.includes(n.id);
+        const isCurrent = state.currentVisit === n.id && state.running;
 
-        if(isS||isE||isCenter||n.id===state.targetNode) {
+        if(isS||isE||isCenter||n.id===state.targetNode||isCurrent) {
             n.pulse+=0.05; const s=1+Math.sin(n.pulse)*0.2;
             ctx.beginPath(); ctx.arc(px,py,25*s,0,Math.PI*2);
-            ctx.fillStyle=isCenter?'rgba(249,115,22,0.3)':isS?'rgba(37,99,235,0.25)':isE?'rgba(245,158,11,0.25)':'rgba(251,191,36,0.2)';
+            ctx.fillStyle=isCenter?'rgba(249,115,22,0.15)':isS?'rgba(37,99,235,0.15)':isE?'rgba(245,158,11,0.15)':isCurrent?'rgba(59,130,246,0.2)':'rgba(251,191,36,0.12)';
             ctx.fill();
         }
 
@@ -227,18 +216,28 @@ function draw() {
         if(isCenter) { ctx.fillStyle='#f97316'; ctx.strokeStyle='#fed7aa'; ctx.lineWidth=3; }
         else if(isS&&state.phase>=3) { ctx.fillStyle='#2563eb'; ctx.strokeStyle='#93c5fd'; ctx.lineWidth=3; }
         else if(isE&&state.phase>=3) { ctx.fillStyle='#f59e0b'; ctx.strokeStyle='#fde68a'; ctx.lineWidth=3; }
-        else if(state.diameterPath.includes(n.id)) { ctx.fillStyle='#fbbf24'; ctx.strokeStyle='#fff'; ctx.lineWidth=3; }
-        else { ctx.fillStyle=n.color; ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=2; }
+        else if(state.diameterPath.includes(n.id)) { ctx.fillStyle='#fbbf24'; ctx.strokeStyle='#f59e0b'; ctx.lineWidth=3; }
+        else { ctx.fillStyle=n.color; ctx.strokeStyle='#94a3b8'; ctx.lineWidth=2; }
         ctx.fill(); ctx.stroke();
 
-        ctx.fillStyle='white'; ctx.font='bold 14px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        // 当前节点额外脉冲环
+        if(isCurrent) {
+            n.pulse+=0.03; const rs=1+Math.sin(n.pulse*1.5)*0.15;
+            ctx.beginPath(); ctx.arc(px,py,n.currentRadius*rs+6,0,Math.PI*2);
+            const curColor = (state.phase===1) ? 'rgba(16,185,129,0.4)' : 'rgba(37,99,235,0.4)';
+            ctx.strokeStyle=curColor; ctx.lineWidth=3; ctx.stroke();
+        }
+
+        const isColored = isCenter || (isS&&state.phase>=3) || (isE&&state.phase>=3) || state.diameterPath.includes(n.id)
+            || n.color==='#10b981' || n.color==='#2563eb';
+        ctx.fillStyle = isColored ? '#fff' : '#1e293b';
+        ctx.font='bold 14px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
         ctx.fillText(n.id, px, py);
 
-        if(isS&&state.phase>=1.5) { ctx.fillStyle='#60a5fa'; ctx.font='bold 13px sans-serif'; ctx.fillText('s', px, py-28); }
-        if(isE&&state.phase>=2.5) { ctx.fillStyle='#fbbf24'; ctx.font='bold 13px sans-serif'; ctx.fillText('e', px, py-28); }
+        if(isS&&state.phase>=1.5) { ctx.fillStyle='#2563eb'; ctx.font='bold 13px sans-serif'; ctx.fillText('s', px, py-28); }
+        if(isE&&state.phase>=2.5) { ctx.fillStyle='#f59e0b'; ctx.font='bold 13px sans-serif'; ctx.fillText('e', px, py-28); }
         if(isCenter&&state.phase>=3) { ctx.fillStyle='#f97316'; ctx.font='bold 13px sans-serif'; ctx.fillText('中心', px, py-28); }
-
-        if(n.dist!==null) { ctx.fillStyle='#94a3b8'; ctx.font='12px sans-serif'; ctx.fillText(`d:${n.dist}`, px, py+30); }
+        if(n.dist!==null) { ctx.fillStyle='#64748b'; ctx.font='12px sans-serif'; ctx.fillText(`d:${n.dist}`, px, py+30); }
     });
 
     if(state.running&&!state.paused) {
@@ -250,7 +249,7 @@ function draw() {
 
 function resetSimulation() {
     state.running=false; state.paused=false; state.ended=false; state.phase=0;
-    state.nodeS=null; state.nodeE=null; state.targetNode=null;
+    state.nodeS=null; state.nodeE=null; state.targetNode=null; state.currentVisit=null;
     state.diameterPath=[]; state.centerNodes=[]; state.waitingForNext=false;
     state.visited.clear(); state.dfsStack=[]; state.parentMap={};
     initGraph(); showMessage('已重置（新随机树）'); updateUI();
@@ -261,8 +260,7 @@ function toggleSimulation() {
     if(state.running) { state.running=false; state.paused=true; }
     else {
         if(!state.paused) {
-            state.phase=1;
-            const start=Math.floor(Math.random()*state.nodes.length);
+            state.phase=1; const start=Math.floor(Math.random()*state.nodes.length);
             startDFS(start); showMessage(`从节点 ${start} 开始第一次 DFS...`);
         }
         state.running=true; state.paused=false;

@@ -6,12 +6,12 @@
     <title>输入输出符号保卫战 - 王老师的课堂笔记</title>
     <style>
         :root {
-            --bg-color: #0a0e14;
-            --panel-color: #1a1f26;
-            --primary-color: #3b82f6; /* Brand Blue */
+            --bg-color: #f8fafc;
+            --panel-color: #ffffff;
+            --primary-color: #2563eb; /* Brand Blue */
             --danger-color: #ff3e3e;
-            --accent-color: #60a5fa;
-            --text-color: #e0e6ed;
+            --accent-color: #2563eb;
+            --text-color: #1e293b;
         }
 
         body {
@@ -35,15 +35,16 @@
             height: 100%;
             display: flex;
             flex-direction: column;
-            background: linear-gradient(180deg, #0a0e14 0%, #161b22 100%);
+            background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
         }
 
         #hud {
             padding: 15px;
             display: flex;
             justify-content: space-between;
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(255, 255, 255, 0.9);
             border-bottom: 2px solid var(--primary-color);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
             z-index: 10;
         }
 
@@ -79,7 +80,7 @@
         #controls {
             padding: 20px;
             background: var(--panel-color);
-            border-top: 1px solid #333;
+            border-top: 1px solid #e2e8f0;
             display: flex;
             flex-direction: column;
             gap: 10px;
@@ -90,7 +91,7 @@
             text-align: center;
             font-size: 14px;
             margin-bottom: 5px;
-            color: #888;
+            color: #64748b;
         }
 
         .btn-group {
@@ -119,8 +120,8 @@
         }
 
         #btn-right {
-            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-            box-shadow: 0 4px 0 #5b21b6;
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            box-shadow: 0 4px 0 #3730a3;
         }
 
         .action-btn:active {
@@ -134,7 +135,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.85);
+            background: rgba(248, 250, 252, 0.95);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -166,10 +167,10 @@
 
         .key-tip {
             display: inline-block;
-            background: #333;
+            background: #e2e8f0;
             padding: 2px 8px;
             border-radius: 4px;
-            color: var(--accent-color);
+            color: var(--primary-color);
             font-weight: bold;
         }
 
@@ -178,7 +179,7 @@
             top: 80px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 212, 255, 0.9);
+            background: rgba(37, 99, 235, 0.9);
             color: #000;
             padding: 10px 20px;
             border-radius: 20px;
@@ -408,7 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
         draw() {
             ctx.save();
             // Draw connector line
-            ctx.strokeStyle = this.passed ? (this.matched ? '#3b82f6' : '#ff3e3e') : '#444';
+            ctx.strokeStyle = this.passed ? (this.matched ? '#3b82f6' : '#ff3e3e') : '#cbd5e1';
             ctx.setLineDash([5, 5]);
             ctx.beginPath();
             ctx.moveTo(this.x, this.y + this.height/2);
@@ -426,8 +427,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.fill();
 
             // Variable box
-            ctx.fillStyle = '#1a1f26';
-            ctx.strokeStyle = '#555';
+            ctx.fillStyle = '#f8fafc';
+            ctx.strokeStyle = '#cbd5e1';
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.roundRect(this.x + 40, this.y, 70, this.height, 5);
@@ -439,8 +440,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.font = 'bold 16px monospace';
             ctx.textAlign = 'center';
             ctx.fillText(this.label, this.x - 30, this.y + 25);
-            
-            ctx.fillStyle = '#aaa';
+
+            ctx.fillStyle = '#475569';
             ctx.font = '14px monospace';
             ctx.fillText(this.varName, this.x + 75, this.y + 25);
 
@@ -555,11 +556,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const centerY = canvas.height / 2;
 
         // Draw static machine base
-        ctx.fillStyle = '#2c3e50';
+        ctx.fillStyle = '#e2e8f0';
         ctx.beginPath();
         ctx.roundRect(centerX - 40, centerY - 60, 80, 120, 10);
         ctx.fill();
-        ctx.strokeStyle = portalDir === '<<' ? '#3b82f6' : '#8b5cf6';
+        ctx.strokeStyle = portalDir === '<<' ? '#3b82f6' : '#6366f1';
         ctx.lineWidth = 3;
         ctx.stroke();
 
@@ -568,16 +569,16 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.shadowColor = ctx.strokeStyle;
 
         // Draw the arrows
-        ctx.fillStyle = 'white';
+        ctx.fillStyle = '#1e293b';
         ctx.font = 'bold 32px monospace';
         ctx.textAlign = 'center';
         ctx.fillText(portalDir, centerX, centerY + 10);
-        
+
         ctx.shadowBlur = 0;
 
         // Labels above machine
         ctx.font = '10px monospace';
-        ctx.fillStyle = '#888';
+        ctx.fillStyle = '#64748b';
         ctx.fillText("SYMBOL GATE", centerX, centerY - 45);
     }
 
@@ -587,7 +588,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         // Draw background grid
-        ctx.strokeStyle = 'rgba(59, 130, 246, 0.05)';
+        ctx.strokeStyle = 'rgba(37, 99, 235, 0.08)';
         ctx.lineWidth = 1;
         for (let i = 0; i < canvas.width; i += 40) {
             ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();

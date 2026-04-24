@@ -10,13 +10,14 @@
             --brand: #2563eb;
             --brand-glow: rgba(37, 99, 235, 0.4);
             --text-gold: #fbbf24;
+            --bg: #f8fafc;
         }
 
         body {
             margin: 0;
             padding: 0;
-            background-color: var(--space-bg);
-            color: white;
+            background-color: var(--bg);
+            color: #1e293b;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
             overflow: hidden;
             touch-action: none;
@@ -37,7 +38,8 @@
             max-width: 100%;
             max-height: 100%;
             background: radial-gradient(circle at center, #1b2735 0%, #090a0f 100%);
-            box-shadow: 0 0 20px var(--brand-glow);
+            border-radius: 16px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15), 0 0 20px var(--brand-glow);
         }
 
         #ui-layer {
@@ -56,23 +58,32 @@
             justify-content: space-between;
             font-size: 20px;
             font-weight: bold;
-            text-shadow: 0 0 10px rgba(0,0,0,0.5);
             pointer-events: auto;
         }
 
+        .hud-card {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(8px);
+            padding: 8px 16px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
         #score-display { color: var(--brand); }
-        #combo-display { color: #f472b6; }
+        #combo-display { color: #6366f1; }
         #formula-hint { 
             position: absolute; 
             bottom: 120px; 
             left: 50%; 
             transform: translateX(-50%);
-            background: rgba(0,0,0,0.6);
+            background: rgba(255,255,255,0.95);
             padding: 5px 15px;
             border-radius: 20px;
             font-size: 14px;
-            color: var(--text-gold);
-            border: 1px solid var(--text-gold);
+            color: #b45309;
+            border: 1px solid #fbbf24;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
         }
 
         #start-screen, #game-over {
@@ -81,7 +92,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(10, 10, 26, 0.9);
+            background: rgba(248, 250, 252, 0.95);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -96,21 +107,22 @@
         h1 {
             font-size: 2.5rem;
             color: var(--brand);
-            text-shadow: 0 0 20px var(--brand-glow);
             margin-bottom: 10px;
         }
 
         .instruction-card {
-            background: rgba(255, 255, 255, 0.1);
+            background: #ffffff;
             padding: 20px;
             border-radius: 15px;
             margin-bottom: 30px;
             max-width: 500px;
-            border: 1px solid var(--brand);
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            color: #1e293b;
         }
 
         .mnemonic {
-            color: var(--text-gold);
+            color: #b45309;
             font-weight: bold;
             font-size: 1.2rem;
             margin: 10px 0;
@@ -125,13 +137,13 @@
             border-radius: 50px;
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
-            box-shadow: 0 0 15px var(--brand-glow);
+            box-shadow: 0 4px 15px var(--brand-glow);
             font-weight: bold;
         }
 
         .btn:hover {
             transform: scale(1.05);
-            box-shadow: 0 0 25px var(--brand-glow);
+            box-shadow: 0 6px 25px var(--brand-glow);
         }
 
         .hidden { display: none !important; }
@@ -146,19 +158,21 @@
         }
 
         .control-btn {
-            width: 80px;
-            height: 80px;
-            background: rgba(255, 255, 255, 0.1);
+            width: 70px;
+            height: 70px;
+            background: #ffffff;
             border: 2px solid var(--brand);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
+            color: var(--brand);
             font-size: 2rem;
             user-select: none;
             cursor: pointer;
             -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            font-weight: bold;
         }
 
         .control-btn:active {
@@ -249,8 +263,8 @@ document.addEventListener("DOMContentLoaded", function() {
 
     <div id="ui-layer">
         <div class="hud">
-            <div id="score-display">分数: 0</div>
-            <div id="combo-display">连击: x0</div>
+            <div class="hud-card"><span id="score-display">分数: 0</span></div>
+            <div class="hud-card"><span id="combo-display">连击: x0</span></div>
         </div>
         <div id="formula-hint">四年一闰，百年不闰，四百年再闰！</div>
         
