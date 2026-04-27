@@ -16,7 +16,7 @@ NAV_BAR = '''
         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
         返回首页
     </a>
-    <span style="font-size:12px;color:#9ca3af;">王老师的课堂笔记</span>
+    <span style="font-size:12px;color:#9ca3af;">远明老师的课堂笔记</span>
 </nav>
 <div style="height:48px;"></div>
 '''
@@ -27,7 +27,7 @@ FOOTER = '''
 <footer style="text-align:center;padding:16px;font-size:12px;color:#9ca3af;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC',sans-serif;">
     <a href="../index.html" style="color:#9ca3af;text-decoration:none;">返回首页</a>
     <span style="margin:0 8px;">·</span>
-    <span>王老师的课堂笔记</span>
+    <span>远明老师的课堂笔记</span>
 </footer>
 '''
 
@@ -74,7 +74,7 @@ def add_shell_to_html(filepath):
     # 修改 title，加上站点名
     content = re.sub(
         r'<title>(.*?)</title>',
-        lambda m: f'<title>{m.group(1)} - 王老师的课堂笔记</title>',
+        lambda m: f'<title>{m.group(1)} - 远明老师的课堂笔记</title>',
         content
     )
     

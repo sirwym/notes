@@ -24,3 +24,14 @@ venv/
 
 # ===== 其他 =====
 Thumbs.db
+
+# ===== WorkBuddy / Agent 配置（含隐私信息，不提交） =====
+AGENTS.md
+BOOTSTRAP.md
+HEARTBEAT.md
+IDENTITY.md
+SOUL.md
+TOOLS.md
+USER.md
+.claude/
+.openclaw/

@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>贪吃蛇：目标余数猎手</title>
+<script src="/assets/tailwind.js"></script>
+<style>
+  @import url('/assets/fonts.css');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#f8fafc;font-family:'Noto Sans SC',sans-serif;overflow:hidden;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  #game-wrap{position:relative;display:inline-block;transform-origin:center center}
+  canvas{display:block;border-radius:8px;cursor:pointer}
+  #hud{position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;z-index:10;pointer-events:none}
+  .hi{background:rgba(255,255,255,0.9);backdrop-filter:blur(8px);border:1px solid rgba(148,163,184,0.3);border-radius:12px;padding:4px 12px;color:#334155;font-size:13px;font-weight:600;white-space:nowrap}
+  .hi .v{color:#2563eb;font-family:monospace}
+  /* 目标个位大号显示 */
+  #target-card{position:absolute;top:6px;right:8px;z-index:11;pointer-events:none;background:rgba(37,99,235,0.1);border:2px solid rgba(37,99,235,0.3);border-radius:12px;padding:4px 14px;display:flex;align-items:center;gap:8px;transition:all .3s}
+  #target-card.pulse{transform:scale(1.15);border-color:rgba(37,99,235,0.6)}
+  .target-label{color:#64748b;font-size:11px;font-weight:600}
+  .target-digit{color:#2563eb;font-size:28px;font-weight:900;font-family:monospace;line-height:1}
+  /* 计分板 */
+  #score-panel{position:absolute;top:50px;left:8px;z-index:10;pointer-events:none;display:flex;flex-direction:column;gap:3px}
+  .sp-item{background:rgba(255,255,255,0.85);backdrop-filter:blur(6px);border:1px solid rgba(148,163,184,0.25);border-radius:8px;padding:2px 8px;font-size:11px;color:#64748b;display:flex;align-items:center;gap:4px}
+  .sp-item .vv{color:#1e293b;font-weight:600;font-family:monospace}
+  /* 血量 */
+  #hearts-bar{position:absolute;top:50px;right:8px;z-index:10;pointer-events:none;font-size:16px}
+  /* 代码提示条 */
+  #code-hint{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,0.9);backdrop-filter:blur(8px);border:1px solid rgba(148,163,184,0.4);border-radius:12px;padding:5px 14px;color:#64748b;font-family:'Courier New',monospace;font-size:12px;z-index:10;pointer-events:none;transition:color .3s,border-color .3s;white-space:nowrap}
+  #code-hint.flash{color:#2563eb;border-color:rgba(37,99,235,0.5)}
+  /* 覆盖层 */
+  #overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:20;border-radius:8px}
+  .oc{background:rgba(255,255,255,0.95);backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,0.3);border-radius:16px;padding:28px 36px;text-align:center;max-width:440px;width:90%}
+  .oc h2{color:#1e293b;font-size:26px;font-weight:800;margin-bottom:6px}
+  .oc p{color:#64748b;font-size:13px;line-height:1.7;margin-bottom:12px}
+  .oc .hl{color:#2563eb;font-weight:600}
+  .oc .fb{background:rgba(241,245,249,0.95);border-radius:8px;padding:10px;margin:10px 0;font-family:'Courier New',monospace;color:#1e293b;font-size:13px;text-align:left;line-height:1.6}
+  .btn{background:#2563eb;color:#fff;border:none;border-radius:10px;padding:11px 28px;font-size:15px;font-weight:700;cursor:pointer;transition:all .2s}
+  .btn:hover{background:#1d4ed8;transform:translateY(-1px)}
+  .sg{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;text-align:left;margin:12px 0}
+  .sg .lb{color:#94a3b8;font-size:12px}
+  .sg .vl{color:#1e293b;font-size:16px;font-weight:700;font-family:monospace}
+  .grade{font-size:52px;font-weight:900;margin:4px 0}
+  .grade.S{color:#fbbf24;text-shadow:0 0 20px rgba(251,191,36,0.5)}
+  .grade.A{color:#60a5fa;text-shadow:0 0 15px rgba(96,165,250,0.4)}
+  .grade.B{color:#34d399}
+  .grade.C{color:#94a3b8}
+  .grade.D{color:#f87171}
+  .digit-hint{position:absolute;z-index:11;pointer-events:none;background:rgba(37,99,235,0.1);color:#2563eb;border:1px solid rgba(37,99,235,0.25);border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600;font-family:monospace;animation:dhFade 2.5s ease-out forwards}
+  @keyframes dhFade{0%{opacity:0;transform:translateY(6px)}15%{opacity:1;transform:translateY(0)}80%{opacity:1}100%{opacity:0}}
+  .float-msg{position:absolute;z-index:15;pointer-events:none;font-family:monospace;font-weight:700;font-size:16px;animation:fmUp 0.8s ease-out forwards}
+  @keyframes fmUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-36px) scale(1.3)}}
+  #keys-hint{position:absolute;bottom:-30px;left:50%;transform:translateX(-50%);color:#94a3b8;font-size:11px;pointer-events:none;white-space:nowrap}
+  #keys-hint kbd{background:rgba(148,163,184,0.15);border:1px solid rgba(148,163,184,0.3);border-radius:4px;padding:1px 6px;font-family:monospace;font-size:10px;color:#64748b;margin:0 2px}
+  /* 穿墙闪光 */
+  .wrap-flash{position:absolute;z-index:14;pointer-events:none;width:30px;height:30px;border-radius:50%;animation:wfPulse 0.4s ease-out forwards}
+  @keyframes wfPulse{0%{opacity:0.6;transform:scale(0.5)}100%{opacity:0;transform:scale(2)}}
+</style>
+</head>
+<body>
+
+<div id="game-wrap">
+  <canvas id="c" width="600" height="480"></canvas>
+
+  <!-- 顶部 HUD -->
+  <div id="hud">
+    <div class="hi">得分 <span class="v" id="sp-score">0</span></div>
+    <div class="hi">连击 <span class="v" id="sp-combo">×1</span></div>
+    <div class="hi">蛇长 <span class="v" id="sp-len">3</span></div>
+  </div>
+
+  <!-- 目标个位大号卡片 -->
+  <div id="target-card">
+    <span class="target-label">目标</span>
+    <span class="target-digit" id="target-display">3</span>
+  </div>
+
+  <!-- 血量 -->
+  <div id="hearts-bar"></div>
+
+  <!-- 代码提示条 -->
+  <div id="code-hint">if (food % 10 == target) 吃掉 ✓</div>
+
+  <!-- 覆盖层 -->
+  <div id="overlay">
+    <div class="oc" id="ov-start">
+      <h2>贪吃蛇：目标余数猎手</h2>
+      <p>
+        控制贪吃蛇吃掉<span class="hl">个位数字匹配</span>的食物<br>
+        只有 <span class="hl">数字 % 10 == 目标个位</span> 时才能吃<br>
+        蛇可以<span class="hl">穿墙</span>！从右边出去会从左边回来
+      </p>
+      <div class="fb">
+        // 取个位（% 10 取余运算）<br>
+        int lastDigit = food % 10;<br>
+        if (lastDigit == target) 吃掉！<br>
+        <br>
+        // 穿墙 = 取模运算<br>
+        newX = (headX + dirX + COLS) % COLS;
+      </div>
+      <p>吃掉正确食物后，数字<span class="hl">除以10砍掉尾巴</span>，到新位置继续</p>
+      <button class="btn" id="btn-start">开始狩猎！</button>
+    </div>
+    <div class="oc" id="ov-pause" style="display:none">
+      <h2>⏸ 已暂停</h2>
+      <p>按 <span class="hl">空格</span> 继续游戏</p>
+      <button class="btn" id="btn-resume">继续</button>
+    </div>
+    <div class="oc" id="ov-over" style="display:none">
+      <h2 id="ov-title">游戏结束</h2>
+      <div class="grade" id="ov-grade"></div>
+      <div class="sg">
+        <div><div class="lb">最终得分</div><div class="vl" id="ov-score">0</div></div>
+        <div><div class="lb">蛇身长度</div><div class="vl" id="ov-len">3</div></div>
+        <div><div class="lb">正确次数</div><div class="vl" id="ov-correct">0</div></div>
+        <div><div class="lb">总吃次数</div><div class="vl" id="ov-total">0</div></div>
+        <div><div class="lb">最高连击</div><div class="vl" id="ov-maxcombo">×1</div></div>
+        <div><div class="lb">穿墙次数</div><div class="vl" id="ov-wraps">0</div></div>
+      </div>
+      <p id="ov-reason" style="color:#f87171"></p>
+      <div class="fb" id="ov-formula" style="display:none"></div>
+      <button class="btn" id="btn-restart">再来一局</button>
+    </div>
+  </div>
+
+  <div id="keys-hint">
+    <kbd>↑↓←→</kbd> / <kbd>WASD</kbd> 移动 &nbsp; <kbd>空格</kbd> 暂停
+  </div>
+</div>
+
+<script>
+// ========== 音效 ==========
+const AC=window.AudioContext||window.webkitAudioContext;
+let actx=null;
+function ea(){if(!actx)actx=new AC()}
+function ps(f,d,t='sine',v=0.1){ea();const o=actx.createOscillator(),g=actx.createGain();o.type=t;o.frequency.value=f;g.gain.setValueAtTime(v,actx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+d);o.connect(g);g.connect(actx.destination);o.start();o.stop(actx.currentTime+d)}
+function sfxEat(){ps(523,0.1,'sine',0.08);setTimeout(()=>ps(659,0.1,'sine',0.08),60)}
+function sfxWrong(){ps(200,0.25,'sawtooth',0.1)}
+function sfxWrap(){ps(440,0.1,'sine',0.05);setTimeout(()=>ps(660,0.1,'sine',0.05),50)}
+function sfxOver(){ps(200,0.4,'sawtooth',0.1);setTimeout(()=>ps(150,0.5,'sawtooth',0.08),200)}
+
+// ========== 配置 ==========
+const COLS=20,ROWS=16,CELL=30;
+const CANVAS_W=COLS*CELL,CANVAS_H=ROWS*CELL;
+const FOOD_COUNT=4;
+const INITIAL_SPEED=150;
+const MIN_SPEED=60;
+const SPEED_STEP=10;
+const SPEED_EVERY=2;
+const FOOD_DIGITS_START=2;
+const FOOD_DIGITS_MAX=4;
+
+// 设置 canvas 尺寸
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+canvas.width=CANVAS_W;canvas.height=CANVAS_H;
+
+// 响应式缩放
+function resizeWrap(){
+  const wrap=document.getElementById('game-wrap');
+  const maxW=window.innerWidth-24;
+  const maxH=window.innerHeight-60;
+  const scale=Math.min(1,maxW/CANVAS_W,maxH/(CANVAS_H+40));
+  wrap.style.transform=`scale(${scale})`;
+}
+resizeWrap();window.addEventListener('resize',resizeWrap);
+
+// ========== DOM 引用 ==========
+const $codeHint=document.getElementById('code-hint');
+const $targetCard=document.getElementById('target-card');
+const $targetDisplay=document.getElementById('target-display');
+const $heartsBar=document.getElementById('hearts-bar');
+const $spScore=document.getElementById('sp-score');
+const $spCombo=document.getElementById('sp-combo');
+const $spLen=document.getElementById('sp-len');
+const $overlay=document.getElementById('overlay');
+const $ovStart=document.getElementById('ov-start');
+const $ovPause=document.getElementById('ov-pause');
+const $ovOver=document.getElementById('ov-over');
+
+// ========== 游戏状态 ==========
+let snake=[];
+let direction={x:1,y:0};
+let nextDirection={x:1,y:0};
+let foods=[];
+let targetDigit=0;
+let score=0;
+let combo=0;
+let maxCombo=0;
+let correctCount=0;
+let totalEats=0;
+let hearts=3;
+let wrapCount=0;
+let tickInterval=INITIAL_SPEED;
+let lastTickTime=0;
+let gameState='idle';
+let animFrameId=null;
+let particles=[];
+let damageFlash=0;
+
+// ========== 工具函数 ==========
+function posKey(x,y){return`${x},${y}`}
+function randInt(min,max){return Math.floor(Math.random()*(max-min+1))+min}
+function randDigit(){return randInt(0,9)}
+function occupiedPositions(){
+  const set=new Set();
+  for(const s of snake)set.add(posKey(s.x,s.y));
+  for(const f of foods)set.add(posKey(f.x,f.y));
+  return set;
+}
+
+// ========== 食物系统 ==========
+function maxDigitsForProgress(){return Math.min(FOOD_DIGITS_START+Math.floor(correctCount/4),FOOD_DIGITS_MAX)}
+function randomFoodValue(){
+  const maxD=maxDigitsForProgress();const d=randInt(FOOD_DIGITS_START,maxD);
+  return randInt(Math.pow(10,d-1),Math.pow(10,d)-1);
+}
+function spawnFood(forceMatchTarget){
+  const occupied=occupiedPositions();
+  for(let i=0;i<500;i++){
+    const x=randInt(0,COLS-1),y=randInt(0,ROWS-1);
+    if(occupied.has(posKey(x,y)))continue;
+    let value;
+    if(forceMatchTarget){
+      const maxD=maxDigitsForProgress();const d=randInt(Math.max(2,maxD-1),maxD);
+      const prefix=randInt(Math.pow(10,d-2),Math.pow(10,d-1)-1);
+      value=prefix*10+targetDigit;
+    }else{value=randomFoodValue()}
+    return{x,y,value};
+  }
+  const head=snake[0];
+  return{x:(head.x+Math.floor(COLS/2))%COLS,y:(head.y+Math.floor(ROWS/2))%ROWS,value:randInt(10,99)};
+}
+function initFoods(){foods=[];foods.push(spawnFood(true));for(let i=1;i<FOOD_COUNT;i++)foods.push(spawnFood(false))}
+function ensureTargetMatch(){
+  if(!foods.some(f=>f.value%10===targetDigit)){
+    const idx=foods.findIndex(f=>f.value%10!==targetDigit);
+    if(idx>=0)foods[idx]=spawnFood(true);
+  }
+}
+
+// ========== 蛇逻辑 ==========
+function initSnake(){
+  snake=[];
+  const sx=Math.floor(COLS/2),sy=Math.floor(ROWS/2);
+  snake.push({x:sx,y:sy},{x:sx-1,y:sy},{x:sx-2,y:sy});
+}
+function snakeOccupies(x,y){return snake.some(s=>s.x===x&&s.y===y)}
+
+// ========== 碰撞检测 ==========
+function findFoodAt(x,y){return foods.find(f=>f.x===x&&f.y===y)}
+
+// ========== 粒子系统 ==========
+function spawnParticles(x,y,color,count){
+  for(let i=0;i<count;i++){
+    const angle=Math.random()*Math.PI*2;const speed=1.5+Math.random()*3;
+    particles.push({x:x*CELL+CELL/2,y:y*CELL+CELL/2,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed-2,life:0.5+Math.random()*0.5,maxLife:0.5+Math.random()*0.5,color,size:2+Math.random()*3});
+  }
+}
+function spawnFloatMsg(x,y,text,color){
+  const el=document.createElement('div');el.className='float-msg';el.textContent=text;el.style.color=color;
+  el.style.left=(x*CELL+CELL/2)+'px';el.style.top=(y*CELL-10)+'px';
+  canvas.parentElement.appendChild(el);setTimeout(()=>el.remove(),800);
+}
+
+// ========== 穿墙特效 ==========
+function showWrapEffect(fromX,fromY,toX,toY,newVal,modVal){
+  // 出发点粒子
+  spawnParticles(fromX,fromY,'#60a5fa',6);
+  // 到达点粒子
+  spawnParticles(toX,toY,'#2563eb',6);
+  // 公式闪光
+  flashCodeHint(`(${fromX} + ${direction.x} + ${COLS}) % ${COLS} = ${newVal} ← 穿墙！`);
+  sfxWrap();
+  wrapCount++;
+}
+
+// ========== 渲染 ==========
+function drawGrid(){
+  ctx.strokeStyle='#e2e8f0';ctx.lineWidth=0.5;
+  for(let x=0;x<=COLS;x++){ctx.beginPath();ctx.moveTo(x*CELL,0);ctx.lineTo(x*CELL,ROWS*CELL);ctx.stroke()}
+  for(let y=0;y<=ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*CELL);ctx.lineTo(COLS*CELL,y*CELL);ctx.stroke()}
+  // 边界高亮（穿墙区域标识）
+  ctx.strokeStyle='rgba(37,99,235,0.2)';ctx.lineWidth=2;
+  ctx.strokeRect(0,0,COLS*CELL,ROWS*CELL);
+}
+
+function drawSnake(){
+  if(snake.length===0)return;
+  const totalLen=snake.length;
+  for(let i=snake.length-1;i>=0;i--){
+    const s=snake[i];const t=totalLen>1?i/(totalLen-1):0;
+    const px=s.x*CELL+2,py=s.y*CELL+2,sz=CELL-4;
+    const r=Math.round(37+t*22),g=Math.round(99+t*66),b=Math.round(235-t*40);
+    ctx.fillStyle=`rgb(${r},${g},${b})`;
+    const radius=5;ctx.beginPath();
+    ctx.moveTo(px+radius,py);ctx.lineTo(px+sz-radius,py);ctx.quadraticCurveTo(px+sz,py,px+sz,py+radius);
+    ctx.lineTo(px+sz,py+sz-radius);ctx.quadraticCurveTo(px+sz,py+sz,px+sz-radius,py+sz);
+    ctx.lineTo(px+radius,py+sz);ctx.quadraticCurveTo(px,py+sz,px,py+sz-radius);
+    ctx.lineTo(px,py+radius);ctx.quadraticCurveTo(px,py,px+radius,py);
+    ctx.closePath();ctx.fill();
+    if(i===0){
+      ctx.fillStyle='#fff';const eyeR=2.5;
+      let ex1,ey1,ex2,ey2;
+      if(direction.x===1){ex1=px+sz-6;ey1=py+6;ex2=px+sz-6;ey2=py+sz-6}
+      else if(direction.x===-1){ex1=px+6;ey1=py+6;ex2=px+6;ey2=py+sz-6}
+      else if(direction.y===-1){ex1=px+6;ey1=py+6;ex2=px+sz-6;ey2=py+6}
+      else{ex1=px+6;ey1=py+sz-6;ex2=px+sz-6;ey2=py+sz-6}
+      ctx.beginPath();ctx.arc(ex1,ey1,eyeR,0,Math.PI*2);ctx.arc(ex2,ey2,eyeR,0,Math.PI*2);ctx.fill();
+    }
+  }
+}
+
+function foodColors(value){
+  const d=String(value).length;
+  if(d>=4)return{bg:'#f59e0b',bgAlpha:0.18,accent:'#fbbf24',border:'#f59e0b'};
+  if(d>=3)return{bg:'#10b981',bgAlpha:0.16,accent:'#34d399',border:'#10b981'};
+  return{bg:'#3b82f6',bgAlpha:0.16,accent:'#60a5fa',border:'#3b82f6'};
+}
+
+function drawFoods(){
+  for(const f of foods){
+    const px=f.x*CELL+3,py=f.y*CELL+3,sz=CELL-6;
+    const colors=foodColors(f.value);
+    const isTarget=(f.value%10===targetDigit);
+    if(isTarget&&gameState==='playing'){ctx.shadowColor=colors.accent;ctx.shadowBlur=10}
+    ctx.fillStyle=colors.bg;ctx.globalAlpha=colors.bgAlpha;
+    ctx.beginPath();ctx.roundRect(px,py,sz,sz,6);ctx.fill();
+    ctx.globalAlpha=1;ctx.shadowColor='transparent';ctx.shadowBlur=0;
+    ctx.strokeStyle=isTarget?colors.accent:'rgba(148,163,184,0.4)';
+    ctx.lineWidth=isTarget?2:1;ctx.beginPath();ctx.roundRect(px,py,sz,sz,6);ctx.stroke();
+    // 数字：个位高亮
+    const str=String(f.value);const mainPart=str.slice(0,-1);const lastDigit=str.slice(-1);
+    ctx.textBaseline='middle';ctx.textAlign='center';
+    const cx=px+sz/2,cy=py+sz/2;
+    if(mainPart.length>0){
+      ctx.font='bold 12px "Courier New",monospace';ctx.fillStyle='#334155';
+      const mw=ctx.measureText(mainPart).width;
+      ctx.fillText(mainPart,cx-4,cy);
+      ctx.font='bold 13px "Courier New",monospace';ctx.fillStyle=colors.accent;
+      ctx.fillText(lastDigit,cx+mw/2+1,cy);
+    }else{
+      ctx.font='bold 13px "Courier New",monospace';ctx.fillStyle=colors.accent;
+      ctx.fillText(lastDigit,cx,cy);
+    }
+  }
+}
+
+function drawParticles(dt){
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];p.life-=dt;if(p.life<=0){particles.splice(i,1);continue}
+    p.x+=p.vx;p.y+=p.vy;const alpha=p.life/p.maxLife;
+    ctx.fillStyle=p.color;ctx.globalAlpha=alpha;ctx.beginPath();ctx.arc(p.x,p.y,p.size*alpha,0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+
+let lastFrameTime=0;
+function render(timestamp){
+  const dt=lastFrameTime?Math.min((timestamp-lastFrameTime)/1000,0.05):0.016;
+  lastFrameTime=timestamp;
+  // 清屏
+  ctx.fillStyle='#f8fafc';ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
+  // 受伤闪红
+  if(damageFlash>0){ctx.fillStyle=`rgba(239,68,68,${damageFlash*0.05})`;ctx.fillRect(0,0,CANVAS_W,CANVAS_H);damageFlash--}
+  drawGrid();drawFoods();drawSnake();drawParticles(dt);
+}
+
+// ========== 游戏流程 ==========
+function tick(){
+  if(gameState!=='playing')return;
+  direction={...nextDirection};
+  const head=snake[0];
+
+  // ===== 穿墙取模 =====
+  const oldX=head.x,oldY=head.y;
+  const newX=((head.x+direction.x)%COLS+COLS)%COLS;
+  const newY=((head.y+direction.y)%ROWS+ROWS)%ROWS;
+
+  // 检测是否穿墙
+  const wrapped=(newX!==head.x+direction.x)||(newY!==head.y+direction.y);
+  if(wrapped){
+    showWrapEffect(oldX,oldY,newX,newY,newX,COLS);
+  }
+
+  // 自撞检测（穿墙后位置可能和身体重叠）
+  if(snakeOccupies(newX,newY)){
+    gameOver('咬到自己了！',null);return;
+  }
+
+  // 食物检测
+  const food=findFoodAt(newX,newY);
+  if(food){
+    const lastDigit=food.value%10;
+    totalEats++;
+    if(lastDigit===targetDigit){
+      // 正确！
+      correctCount++;combo++;if(combo>maxCombo)maxCombo=combo;
+      const digitLen=String(food.value).length;
+      const baseScore=100;const digitBonus=digitLen*30;const comboBonus=(combo-1)*20;
+      const speedBonus=Math.floor((200-tickInterval)*0.5);
+      score+=baseScore+digitBonus+comboBonus+speedBonus;
+      sfxEat();
+      spawnParticles(food.x,food.y,'#34d399',12);
+      spawnFloatMsg(food.x,food.y,`+${baseScore+digitBonus+comboBonus+speedBonus}`,'#34d399');
+      // 砍尾巴
+      const newValue=Math.floor(food.value/10);
+      if(newValue<10){
+        foods=foods.filter(ff=>ff!==food);foods.push(spawnFood(false));
+      }else{
+        const occupied=occupiedPositions();occupied.delete(posKey(food.x,food.y));
+        let placed=false;
+        for(let i=0;i<200;i++){
+          const nx=randInt(0,COLS-1),ny=randInt(0,ROWS-1);
+          if(!occupied.has(posKey(nx,ny))&&(nx!==newX||ny!==newY)){food.x=nx;food.y=ny;food.value=newValue;placed=true;break}
+        }
+        if(!placed)food.value=newValue;
+      }
+      // 切换目标
+      targetDigit=randDigit();ensureTargetMatch();
+      updateTargetDisplay();
+      // 难度递增
+      tickInterval=Math.max(MIN_SPEED,INITIAL_SPEED-Math.floor(correctCount/SPEED_EVERY)*SPEED_STEP);
+      flashCodeHint(`${food.value*10+lastDigit} % 10 = ${lastDigit} ✓ → 新目标: ${targetDigit}`);
+    }else{
+      // 错误！扣血
+      hearts--;combo=0;
+      sfxWrong();damageFlash=15;
+      spawnParticles(food.x,food.y,'#ef4444',10);
+      spawnFloatMsg(food.x,food.y,'❤️-1','#ef4444');
+      // 移除错误食物
+      foods=foods.filter(ff=>ff!==food);foods.push(spawnFood(false));ensureTargetMatch();
+      flashCodeHint(`${food.value} % 10 = ${lastDigit} ≠ ${targetDigit}  ❤️${hearts}/3`);
+      updateHeartsDisplay();
+      if(hearts<=0){gameOver(`吃错太多次！${food.value} % 10 = ${lastDigit} ≠ ${targetDigit}`,food);return}
+      // 蛇移动但不增长
+      snake.unshift({x:newX,y:newY});snake.pop();
+      updateUI();return;
+    }
+    // 吃对：蛇增长
+    snake.unshift({x:newX,y:newY});
+  }else{
+    // 普通移动
+    snake.unshift({x:newX,y:newY});snake.pop();
+  }
+  updateUI();
+}
+
+function flashCodeHint(msg){
+  $codeHint.textContent=msg;$codeHint.classList.add('flash');
+  setTimeout(()=>$codeHint.classList.remove('flash'),1500);
+}
+
+function updateUI(){
+  $spScore.textContent=score;
+  $spCombo.textContent='×'+(combo||1);
+  $spLen.textContent=snake.length;
+}
+
+function updateTargetDisplay(){
+  $targetDisplay.textContent=targetDigit;
+  $targetCard.classList.add('pulse');
+  setTimeout(()=>$targetCard.classList.remove('pulse'),300);
+  $codeHint.textContent=`if (food % 10 == ${targetDigit}) 吃掉 ✓`;
+}
+
+function updateHeartsDisplay(){
+  let s='';for(let i=0;i<3;i++)s+=i<hearts?'❤️':'🖤';
+  $heartsBar.textContent=s;
+}
+
+function gameOver(reason,wrongFood){
+  gameState='over';sfxOver();
+  $ovStart.style.display='none';$ovPause.style.display='none';$ovOver.style.display='';
+  $ovOver.querySelector('#ov-title').textContent=hearts<=0?'吃错太多次！':'游戏结束';
+  $ovOver.querySelector('#ov-score').textContent=score;
+  $ovOver.querySelector('#ov-len').textContent=snake.length;
+  $ovOver.querySelector('#ov-correct').textContent=correctCount;
+  $ovOver.querySelector('#ov-total').textContent=totalEats;
+  $ovOver.querySelector('#ov-maxcombo').textContent='×'+maxCombo;
+  $ovOver.querySelector('#ov-wraps').textContent=wrapCount;
+  // 评级
+  const accuracy=totalEats>0?correctCount/totalEats:0;
+  let gradeEl=$ovOver.querySelector('#ov-grade');
+  if(correctCount>=30&&accuracy>=0.9){gradeEl.className='grade S';gradeEl.textContent='S'}
+  else if(correctCount>=20&&accuracy>=0.8){gradeEl.className='grade A';gradeEl.textContent='A'}
+  else if(correctCount>=10&&accuracy>=0.6){gradeEl.className='grade B';gradeEl.textContent='B'}
+  else if(correctCount>=5){gradeEl.className='grade C';gradeEl.textContent='C'}
+  else{gradeEl.className='grade D';gradeEl.textContent='D'}
+  $ovOver.querySelector('#ov-reason').textContent=reason||'';
+  const formulaEl=$ovOver.querySelector('#ov-formula');
+  if(wrongFood){
+    formulaEl.style.display='';
+    const ld=wrongFood.value%10;
+    formulaEl.innerHTML=`// 错误分析<br><span style="color:#ef4444">${wrongFood.value}</span> % 10 = <span style="color:#ef4444">${ld}</span><br>结果 ${ld} <span style="color:#ef4444">≠</span> 目标 ${targetDigit}<br><br>// 穿墙 = 取模<br>newX = (headX + dirX + ${COLS}) % ${COLS};<br><span style="color:#94a3b8">// 本局穿墙 ${wrapCount} 次</span>`;
+  }else{
+    formulaEl.style.display='';
+    formulaEl.innerHTML=`// 穿墙 = 取模运算<br>newX = (headX + dirX + ${COLS}) % ${COLS};<br>newY = (headY + dirY + ${ROWS}) % ${ROWS};<br><span style="color:#94a3b8">// 本局穿墙 ${wrapCount} 次</span>`;
+  }
+  $overlay.style.display='';$codeHint.textContent=reason||'';lastFrameTime=0;
+}
+
+function pause(){
+  if(gameState!=='playing')return;gameState='paused';
+  $overlay.style.display='';$ovStart.style.display='none';$ovPause.style.display='';$ovOver.style.display='none';
+  lastFrameTime=0;
+}
+function resume(){
+  if(gameState!=='paused')return;gameState='playing';$overlay.style.display='none';
+  lastFrameTime=0;lastTickTime=performance.now();
+}
+
+function startGame(){
+  score=0;combo=0;maxCombo=0;correctCount=0;totalEats=0;hearts=3;wrapCount=0;
+  tickInterval=INITIAL_SPEED;particles=[];damageFlash=0;
+  targetDigit=randDigit();direction={x:1,y:0};nextDirection={x:1,y:0};
+  initSnake();initFoods();
+  $overlay.style.display='none';updateUI();updateTargetDisplay();updateHeartsDisplay();
+  $codeHint.textContent=`if (food % 10 == ${targetDigit}) 吃掉 ✓`;$codeHint.classList.remove('flash');
+  gameState='playing';lastTickTime=performance.now();lastFrameTime=0;
+}
+
+// ========== 游戏循环 ==========
+function gameLoop(timestamp){
+  if(gameState==='playing'){
+    if(timestamp-lastTickTime>=tickInterval){tick();lastTickTime=timestamp}
+  }
+  render(timestamp);animFrameId=requestAnimationFrame(gameLoop);
+}
+
+// ========== 键盘控制 ==========
+document.addEventListener('keydown',e=>{
+  if(gameState==='idle'){if(e.key===' '||e.key==='Enter'){e.preventDefault();ea();startGame();return}}
+  if(gameState==='over'){if(e.key===' '||e.key==='Enter'||e.key==='r'){e.preventDefault();startGame();return}}
+  if(e.key===' '||e.key==='Escape'){e.preventDefault();if(gameState==='playing')pause();else if(gameState==='paused')resume();return}
+  if(gameState!=='playing')return;
+  switch(e.key){
+    case'ArrowUp':case'w':case'W':e.preventDefault();if(direction.y!==1)nextDirection={x:0,y:-1};break;
+    case'ArrowDown':case's':case'S':e.preventDefault();if(direction.y!==-1)nextDirection={x:0,y:1};break;
+    case'ArrowLeft':case'a':case'A':e.preventDefault();if(direction.x!==1)nextDirection={x:-1,y:0};break;
+    case'ArrowRight':case'd':case'D':e.preventDefault();if(direction.x!==-1)nextDirection={x:1,y:0};break;
+  }
+});
+
+// ========== 按钮事件 ==========
+document.getElementById('btn-start').addEventListener('click',()=>{ea();startGame()});
+document.getElementById('btn-resume').addEventListener('click',resume);
+document.getElementById('btn-restart').addEventListener('click',()=>{ea();startGame()});
+canvas.addEventListener('click',()=>{if(gameState==='idle'){ea();startGame()}else if(gameState==='paused')resume()});
+
+// ========== 初始化 ==========
+targetDigit=randDigit();initSnake();initFoods();updateUI();updateTargetDisplay();updateHeartsDisplay();
+$codeHint.textContent='if (food % 10 == targetDigit) 吃掉 ✓';
+render(0);animFrameId=requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
