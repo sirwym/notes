@@ -193,7 +193,7 @@ def scan_meta_files():
     """扫描 animations/ 和 games/ 下的 .meta.md 文件"""
     items = []
     
-    for subdir in ["animations", "games"]:
+    for subdir in ["animations", "games", "ai"]:
         dir_path = os.path.join(BASE_DIR, subdir)
         if not os.path.isdir(dir_path):
             continue
@@ -236,6 +236,7 @@ def generate_card_html(item):
         "animation": ("tag-animation", "算法动画"),
         "game": ("tag-game", "知识点游戏"),
         "cpp": ("tag-cpp", "C++ 模板"),
+        "ai": ("tag-ai", "AI 实验室"),
     }
     tag_class, tag_label = tag_classes.get(category, ("tag-entry", category))
     
@@ -311,7 +312,7 @@ def main():
     all_items = []
     
     # ---- 第一步：扫描 .meta.md 元数据 ----
-    print("📁 扫描 animations/ 和 games/ 的元数据...")
+    print("📁 扫描 animations/、games/、ai/ 的元数据...")
     meta_items = scan_meta_files()
     all_items.extend(meta_items)
     print(f"  找到 {len(meta_items)} 个动画/游戏\n")

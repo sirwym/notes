@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 图像分类小课堂 · 精准版</title>
+    <script src="../assets/js/tailwind.js"></script>
+    <script src="../assets/js/tf.min.js"></script>
+    <script src="../assets/js/knn-classifier.min.js"></script>
+    <style>
+        .loading-overlay { display: flex; }
+        .loaded .loading-overlay { display: none; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen p-4 md:p-8">
+
+    <div id="loader" class="loading-overlay fixed inset-0 bg-white z-50 flex-col items-center justify-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mb-4"></div>
+        <p class="text-gray-600">正在唤醒 AI 大脑，请稍候...</p>
+    </div>
+
+    <div class="max-w-6xl mx-auto">
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-gray-800">AI 视觉实验室</h1>
+            <p class="text-gray-500 mt-2">点击拍照教机器人认识物体 · 感受 AI 视界</p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <div class="space-y-6" id="categoriesContainer"></div>
+
+            <div class="bg-white p-4 rounded-2xl shadow-md border-2 border-green-100 relative">
+                <div class="rounded-xl overflow-hidden bg-gray-200 aspect-video flex items-center justify-center relative">
+                    <video autoplay playsinline muted id="webcam" class="w-full h-full object-cover transform -scale-x-100"></video>
+                    <div id="flashOverlay" class="absolute inset-0 bg-white opacity-0 pointer-events-none transition-opacity duration-75"></div>
+                </div>
+                <div class="mt-4 text-center">
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span class="w-2 h-2 bg-green-500 rounded-full animate-ping mr-2"></span>
+                        AI 正在观察中...
+                    </span>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
+                <h2 class="font-bold text-gray-800 mb-6 flex items-center">
+                    置信度预测
+                    <span class="ml-2 text-xs font-normal text-gray-400">(AI 的猜想)</span>
+                </h2>
+                <div id="predictionBarsContainer" class="space-y-8 flex-1"></div>
+                <div id="conclusion" class="mt-8 p-4 rounded-xl bg-gray-50 border border-dashed border-gray-200 text-center text-gray-500 italic text-sm">
+                    💡 提示：要想 AI 变聪明，请先把空桌子、你的手、水杯等杂物，都拍几张存进【杂物/背景】里哦！
+                </div>
+                <div class="mt-4 flex gap-2">
+                    <button onclick="downloadModel()" class="flex-1 bg-amber-400 hover:bg-amber-500 text-white py-2 rounded-lg text-sm font-medium transition">
+                        📥 下载模型
+                    </button>
+                    <label class="flex-1 bg-sky-400 hover:bg-sky-500 text-white py-2 rounded-lg text-sm font-medium cursor-pointer text-center transition">
+                        📤 导入模型
+                        <input type="file" accept=".json" onchange="importModel(this.files[0])" class="hidden">
+                    </label>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // ==================== 全局变量 ====================
+        let net;
+        const classifier = knnClassifier.create();
+        const webcamElement = document.getElementById('webcam');
+
+        // 默认内置一个背景分类（用于吸收未知物体的特征）
+        let categories = [
+            { id: 'cat_bg', name: '杂物 / 背景', color: 'gray', count: 0 },
+            { id: 'cat_0', name: '苹果 (示例)', color: 'red', count: 0 },
+            { id: 'cat_1', name: '水杯 (示例)', color: 'blue', count: 0 }
+        ];
+        let nextId = 2;
+
+        // ==================== UI 渲染函数 ====================
+        function renderCategories() {
+            const container = document.getElementById('categoriesContainer');
+            container.innerHTML = '';
+
+            categories.forEach(cat => {
+                const card = document.createElement('div');
+                card.className = 'bg-white p-5 rounded-2xl shadow-sm border border-gray-100';
+                
+                const isBg = cat.id === 'cat_bg';
+                const titleStyling = isBg ? 'text-gray-500 italic' : 'text-gray-700';
+                
+                card.innerHTML = `
+                    <div class="flex justify-between items-center mb-3">
+                        <input type="text" value="${escapeHtml(cat.name)}"
+                               onchange="updateCategoryName('${cat.id}', this.value)"
+                               class="font-bold text-lg ${titleStyling} bg-transparent border-b border-dashed border-gray-300 focus:outline-none focus:border-${cat.color}-500 w-24 md:w-32">
+                        <span id="count-${cat.id}" class="text-xs bg-gray-100 px-2 py-1 rounded font-mono text-gray-500">${cat.count} 张</span>
+                    </div>
+                    <button 
+                        onclick="addSingleExample('${cat.id}')"
+                        class="w-full text-white py-3 rounded-xl transition active:scale-95 font-medium shadow-sm hover:opacity-90"
+                        style="background-color: ${getColorCode(cat.color)};">
+                        📸 点击拍摄 ${isBg ? '手/环境/杂物' : escapeHtml(cat.name)}
+                    </button>
+                    <div class="flex justify-between mt-2">
+                        <button onclick="clearSingleCategorySamples('${cat.id}')" class="text-xs text-orange-400 hover:text-orange-600 transition">
+                            🧹 清空本类照片
+                        </button>
+                        ${!isBg ? `<button onclick="deleteCategory('${cat.id}')" class="text-xs text-red-400 hover:text-red-600 transition">🗑️ 删除分类</button>` : ''}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            const addBtn = document.createElement('button');
+            addBtn.onclick = addNewCategory;
+            addBtn.className = 'w-full border-2 border-dashed border-gray-300 text-gray-400 hover:text-green-500 py-3 rounded-xl transition mt-2';
+            addBtn.innerText = '+ 添加新分类';
+            container.appendChild(addBtn);
+        }
+
+        function renderPredictionBars() {
+            const container = document.getElementById('predictionBarsContainer');
+            container.innerHTML = '';
+            categories.forEach(cat => {
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <div class="flex justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-600">${escapeHtml(cat.name)}</span>
+                        <span class="text-sm font-bold" style="color: ${getColorCode(cat.color)};" id="prob-${cat.id}">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-100 rounded-full h-3">
+                        <div id="bar-${cat.id}" class="h-3 rounded-full transition-all duration-200" style="width: 0%; background-color: ${getColorCode(cat.color)};"></div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function getColorCode(color) {
+            const map = {
+                'green': '#22c55e', 'blue': '#3b82f6', 'red': '#ef4444',
+                'purple': '#a855f7', 'yellow': '#eab308', 'pink': '#ec4899',
+                'orange': '#f97316', 'gray': '#9ca3af'
+            };
+            return map[color] || '#6b7280';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.innerText = text;
+            return div.innerHTML;
+        }
+
+        // ==================== 类别与样本管理 ====================
+        function updateCategoryName(id, newName) {
+            const cat = categories.find(c => c.id === id);
+            if (cat) {
+                cat.name = newName.trim() || cat.name;
+                renderCategories();
+                renderPredictionBars();
+            }
+        }
+
+        async function addNewCategory() {
+            if (categories.length >= 8) {
+                alert('最多支持8个分类哦，不然AI会累坏的～'); return;
+            }
+            const name = prompt('给这个新分类起个名字吧：', `新分类 ${categories.length}`);
+            if (!name) return;
+            
+            categories.push({
+                id: `cat_${nextId++}`,
+                name: name,
+                color: ['purple','green','yellow','pink','orange'][categories.length - 3] || 'teal',
+                count: 0
+            });
+            renderCategories();
+            renderPredictionBars();
+        }
+
+        function deleteCategory(id) {
+            if (categories.length <= 2) {
+                alert('除了背景，至少保留一个具体的分类哦！'); return;
+            }
+            if (!confirm('确定要删除这个分类吗？这会清空所有学习记忆。')) return;
+            
+            categories = categories.filter(c => c.id !== id);
+            classifier.clearAllClasses();
+            categories.forEach(c => c.count = 0);
+            
+            renderCategories();
+            renderPredictionBars();
+        }
+
+        // 新增功能：单独清空某个类别的所有样本
+        function clearSingleCategorySamples(classId) {
+            const cat = categories.find(c => c.id === classId);
+            if (!cat || cat.count === 0) return;
+            
+            if (!confirm(`确定要清空【${cat.name}】里拍的所有照片特征吗？`)) return;
+
+            // KNN API 支持按 label 清除特定类别的特征
+            try {
+                classifier.clearClass(classId);
+            } catch (e) {
+                console.log("该类别可能本来就没数据");
+            }
+            
+            cat.count = 0;
+            document.getElementById(`count-${classId}`).innerText = `0 张`;
+            
+            // 顺便把预测条归零
+            const probEl = document.getElementById(`prob-${classId}`);
+            const barEl = document.getElementById(`bar-${classId}`);
+            if (probEl) probEl.innerText = `0%`;
+            if (barEl) barEl.style.width = `0%`;
+        }
+
+        // ==================== 核心：单次点击采样 ====================
+        function addSingleExample(classId) {
+            // 提取一帧特征并加入分类器
+            const activation = net.infer(webcamElement, 'conv_preds');
+            classifier.addExample(activation, classId);
+            
+            // 更新 UI 计数
+            const cat = categories.find(c => c.id === classId);
+            if (cat) {
+                cat.count++;
+                document.getElementById(`count-${classId}`).innerText = `${cat.count} 张`;
+            }
+
+            // 加一个简单的白光闪烁特效，反馈拍照感
+            const flash = document.getElementById('flashOverlay');
+            flash.style.opacity = '0.5';
+            setTimeout(() => { flash.style.opacity = '0'; }, 100);
+        }
+
+        // ==================== 模型导入导出 ====================
+        // (保持原样，省略细节描述)
+        async function downloadModel() {
+            const totalSamples = categories.reduce((sum, c) => sum + c.count, 0);
+            if (totalSamples === 0) { alert('先拍几张照片吧！'); return; }
+
+            const dataset = classifier.getClassifierDataset();
+            const dataToSave = { version: 3, categories: categories, dataset: {} };
+
+            for (const [label, tensor] of Object.entries(dataset)) {
+                dataToSave.dataset[label] = { shape: tensor.shape, data: await tensor.array() };
+            }
+            const blob = new Blob([JSON.stringify(dataToSave)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'ai-model.json';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        }
+
+        async function importModel(file) {
+            if (!file || !confirm('导入模型会覆盖当前所有记忆，确定吗？')) return;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    const newDataset = {};
+                    for (const [label, info] of Object.entries(data.dataset)) {
+                        newDataset[label] = tf.tensor(info.data, info.shape);
+                    }
+                    classifier.clearAllClasses();
+                    classifier.setClassifierDataset(newDataset);
+                    categories = data.categories;
+                    renderCategories(); renderPredictionBars();
+                } catch (err) { alert('导入失败，请检查文件格式。'); }
+            };
+            reader.readAsText(file);
+        }
+
+        // ==================== 主程序 ====================
+        async function app() {
+            const loaderEl = document.querySelector('#loader p') || document.querySelector('#loader');
+            try {
+                loaderEl.textContent = '正在加载 AI 模型 (约 14MB)，请稍候...';
+                const model = await tf.loadGraphModel('../assets/local_model/model.json');
+                net = {
+                    model: model,
+                    infer: function(imgElement, endpoint) {
+                        return tf.tidy(() => {
+                            const img = tf.browser.fromPixels(imgElement).toFloat();
+                            const resized = tf.image.resizeBilinear(img, [224, 224]);
+                            const normalized = resized.div(127.5).sub(1);
+                            const batched = normalized.expandDims(0);
+                            if (endpoint === 'conv_preds') {
+                                const result = model.execute(batched, ['module_apply_default/MobilenetV2/Logits/AvgPool']);
+                                return Array.isArray(result) ? result[0] : result;
+                            }
+                            const result = model.execute(batched);
+                            return Array.isArray(result) ? result[0] : result;
+                        });
+                    }
+                };
+                document.body.classList.add('loaded');
+            } catch (err) {
+                loaderEl.textContent = '模型加载失败: ' + err.message;
+                console.error('load error:', err);
+                return;
+            }
+
+            const setupWebcam = async () => {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                webcamElement.srcObject = stream;
+                return new Promise(resolve => webcamElement.onloadedmetadata = () => resolve());
+            };
+
+            await setupWebcam();
+            renderCategories();
+            renderPredictionBars();
+
+            // 预测循环（去除了自动采样的逻辑，只负责预测）
+            while (true) {
+                if (classifier.getNumClasses() > 0) {
+                    const activation = net.infer(webcamElement, 'conv_preds');
+                    const result = await classifier.predictClass(activation, 3); // K=3 取最近的3个邻居投票
+
+                    let maxConf = 0;
+                    let bestCat = null;
+                    
+                    categories.forEach(cat => {
+                        const prob = result.confidences[cat.id] || 0;
+                        const percent = Math.floor(prob * 100);
+                        const probEl = document.getElementById(`prob-${cat.id}`);
+                        const barEl = document.getElementById(`bar-${cat.id}`);
+                        if (probEl) probEl.innerText = `${percent}%`;
+                        if (barEl) barEl.style.width = `${percent}%`;
+                        if (prob > maxConf) { maxConf = prob; bestCat = cat; }
+                    });
+
+                    const conclusionEl = document.getElementById('conclusion');
+                    
+                    if (bestCat && bestCat.id === 'cat_bg' && maxConf > 0.4) {
+                        conclusionEl.innerText = '🤔 这是我不认识的东西，或者就是普通的背景。';
+                        conclusionEl.className = 'mt-8 p-4 rounded-xl bg-gray-50 border border-dashed border-gray-400 text-center text-gray-500 font-medium text-sm md:text-base';
+                    } else if (maxConf > 0.65 && bestCat) {
+                        conclusionEl.innerText = `💡 我觉得这看起来非常像【${bestCat.name}】！`;
+                        conclusionEl.className = 'mt-8 p-4 rounded-xl bg-green-50 border border-green-300 text-center text-green-700 font-bold shadow-sm text-sm md:text-base';
+                    } else {
+                        conclusionEl.innerText = '👀 哎呀，我有点眼花，不太确定这是什么...';
+                        conclusionEl.className = 'mt-8 p-4 rounded-xl bg-orange-50 border border-orange-300 text-center text-orange-600 font-medium text-sm md:text-base';
+                    }
+                }
+                await tf.nextFrame();
+            }
+        }
+        app();
+    </script>
+</body>
+</html>

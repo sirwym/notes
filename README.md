@@ -11,6 +11,7 @@
 - **算法动画** — 交互式可视化演示（取余、分装、cin 流等）
 - **知识点游戏** — 游戏化练习（闰年判断、符号识别等）
 - **C++ 代码模板** — GESP 1~8 级共 72 个模板，按知识点分级
+- **AI 实验室** — 浏览器端 AI 图像分类，KNN + MobileNet
 
 纯静态站点，零 CDN 依赖，离线可用。
 
@@ -25,6 +26,7 @@ notes/
 ├── CONVENTIONS.md                 # 开发规范（AI 修改前必读）
 ├── animations/                    # 算法动画 HTML + .meta.md
 ├── games/                         # 知识点游戏 HTML + .meta.md
+├── ai/                            # AI 交互页面 HTML + .meta.md
 ├── cpp/                           # C++ 模板 .md 源文件（G1~G8 分级）
 │   └── dist/                      # 构建产物（.gitignore）
 ├── assets/                        # 本地资源（Tailwind/KaTeX/字体）
