@@ -6,6 +6,10 @@
     <title>AI 图像分类小课堂 · 精准版</title>
     <script src="https://cdn.jsdelivr.net/gh/sirwym/notes@main/assets/js/tailwind.js"
             onerror="this.onerror=null;this.src='../assets/js/tailwind.js'"></script>
+    <script src="https://cdn.jsdelivr.net/gh/sirwym/notes@main/assets/js/tf.min.js"
+            onerror="this.onerror=null;this.src='../assets/js/tf.min.js'"></script>
+    <script src="https://cdn.jsdelivr.net/gh/sirwym/notes@main/assets/js/knn-classifier.min.js"
+            onerror="this.onerror=null;this.src='../assets/js/knn-classifier.min.js'"></script>
     <style>
         .loading-overlay { display: flex; }
         .loaded .loading-overlay { display: none; }
@@ -67,38 +71,6 @@
     <script>
         const CDN = 'https://cdn.jsdelivr.net/gh/sirwym/notes@main';
 
-        function loadScript(cdnPath, localPath, timeoutMs) {
-            return new Promise((resolve, reject) => {
-                const s = document.createElement('script');
-                let resolved = false;
-                const timer = setTimeout(() => {
-                    if (resolved) return;
-                    resolved = true;
-                    s.onload = s.onerror = null;
-                    s.remove();
-                    const fallback = document.createElement('script');
-                    fallback.src = localPath;
-                    fallback.onload = () => resolve();
-                    fallback.onerror = () => reject(new Error('local load failed: ' + localPath));
-                    document.head.appendChild(fallback);
-                }, timeoutMs || 5000);
-                s.src = cdnPath;
-                s.onload = () => { clearTimeout(timer); if (!resolved) { resolved = true; resolve(); } };
-                s.onerror = () => {
-                    clearTimeout(timer);
-                    if (resolved) return;
-                    resolved = true;
-                    s.remove();
-                    const fallback = document.createElement('script');
-                    fallback.src = localPath;
-                    fallback.onload = () => resolve();
-                    fallback.onerror = () => reject(new Error('local load failed: ' + localPath));
-                    document.head.appendChild(fallback);
-                };
-                document.head.appendChild(s);
-            });
-        }
-
         async function loadModel(cdnPath, localPath) {
             try {
                 const resp = await Promise.race([
@@ -113,7 +85,7 @@
 
         // ==================== 全局变量 ====================
         let net;
-        let classifier;
+        const classifier = knnClassifier.create();
         const webcamElement = document.getElementById('webcam');
 
         let categories = [
@@ -340,22 +312,10 @@
             }
         }
 
-        // ==================== 启动：CDN → 本地 fallback ====================
-        (async function init() {
-            const loaderEl = document.querySelector('#loader p') || document.querySelector('#loader');
-            try {
-                loaderEl.innerHTML = '正在加载依赖库<span id="status"></span>，请稍候...';
-                await Promise.all([
-                    loadScript(CDN + '/assets/js/tf.min.js', '../assets/js/tf.min.js'),
-                    loadScript(CDN + '/assets/js/knn-classifier.min.js', '../assets/js/knn-classifier.min.js')
-                ]);
-                classifier = knnClassifier.create();
-                await app();
-            } catch (err) {
-                loaderEl.textContent = '加载失败: ' + err.message;
-                console.error('init error:', err);
-            }
-        })();
+        // ==================== 启动 ====================
+        const loaderEl = document.querySelector('#loader p') || document.querySelector('#loader');
+        loaderEl.innerHTML = '正在加载 AI 模型<span id="status"></span>，请稍候...';
+        app();
     </script>
 </body>
 </html>
