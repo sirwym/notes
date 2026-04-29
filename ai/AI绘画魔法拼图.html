@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 绘画魔法拼图</title>
+    
+    <script src="https://cdn.jsdelivr.net/gh/sirwym/notes@main/assets/js/tailwind.js"
+            onerror="this.onerror=null;this.src='../assets/js/tailwind.js'"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #eff6ff; }
+        .kid-font { font-family: 'ZCOOL KuaiLe', cursive; }
+        
+        /* 优化滚动条体验 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .btn-selected {
+            border-color: #3b82f6 !important;
+            background-color: #eff6ff !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3) !important;
+            transform: scale(0.98);
+        }
+        
+        /* 限制拼图列表高度，内部平滑滚动 */
+        .puzzle-group { 
+            max-height: 55vh; /* 动态适应屏幕高度 */
+            overflow-y: auto; 
+            padding-right: 4px; 
+            scroll-behavior: smooth;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 flex flex-col items-center">
+
+    <header class="mb-6 text-center">
+        <h1 class="text-4xl font-bold text-blue-600 kid-font mb-2">🎨 AI 绘画魔法拼图</h1>
+        <p class="text-blue-600 font-medium text-lg">点一点，拼一拼，对 AI 念出你的魔法咒语！</p>
+    </header>
+
+    <div class="max-w-7xl w-full bg-white rounded-3xl shadow-xl overflow-hidden border-4 border-blue-100">
+        
+        <div class="bg-gradient-to-r from-blue-50 to-blue-100 p-6 md:p-8 border-b-2 border-dashed border-gray-200">
+            <h2 class="text-gray-500 font-bold mb-2 flex items-center">
+                <span class="mr-2">✨</span> 你的专属魔法咒语：
+            </h2>
+            <div class="bg-white p-4 rounded-2xl shadow-inner min-h-[100px] text-xl font-medium text-gray-700 leading-relaxed break-words border border-gray-100" id="prompt-display">
+                <span class="text-gray-300 italic">请在下方选择拼图块...</span>
+            </div>
+            
+            <div class="mt-6 flex gap-4 justify-end">
+                <button onclick="clearPrompt()" class="px-6 py-3 rounded-xl font-bold text-gray-500 bg-white border border-gray-200 hover:bg-gray-50 transition shadow-sm">
+                    🗑️ 重新拼装
+                </button>
+                <button id="copy-btn" onclick="copyPrompt()" class="px-8 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl transition flex items-center transform active:scale-95">
+                    <span class="mr-2">📋</span> <span id="copy-text">一键复制咒语</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="p-4 md:p-6 bg-gray-50">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6" id="puzzle-board">
+                
+                <div class="flex flex-col h-full bg-white p-3 rounded-2xl shadow-sm border border-gray-100 relative">
+                    <div class="bg-red-100 text-red-600 font-bold px-4 py-2 rounded-xl text-center kid-font text-lg shadow-sm mb-3 sticky top-0 z-10 backdrop-blur-md bg-opacity-90">1. 画什么 (主体)</div>
+                    <div class="flex flex-col gap-2 puzzle-group" id="group-subject"></div>
+                </div>
+
+                <div class="flex flex-col h-full bg-white p-3 rounded-2xl shadow-sm border border-gray-100 relative">
+                    <div class="bg-blue-100 text-blue-600 font-bold px-4 py-2 rounded-xl text-center kid-font text-lg shadow-sm mb-3 sticky top-0 z-10 backdrop-blur-md bg-opacity-90">2. 在哪里 (环境)</div>
+                    <div class="flex flex-col gap-2 puzzle-group" id="group-env"></div>
+                </div>
+
+                <div class="flex flex-col h-full bg-white p-3 rounded-2xl shadow-sm border border-gray-100 relative">
+                    <div class="bg-orange-100 text-orange-600 font-bold px-4 py-2 rounded-xl text-center kid-font text-lg shadow-sm mb-3 sticky top-0 z-10 backdrop-blur-md bg-opacity-90">3. 干什么 (细节)</div>
+                    <div class="flex flex-col gap-2 puzzle-group" id="group-action"></div>
+                </div>
+
+                <div class="flex flex-col h-full bg-white p-3 rounded-2xl shadow-sm border border-gray-100 relative">
+                    <div class="bg-purple-100 text-purple-600 font-bold px-4 py-2 rounded-xl text-center kid-font text-lg shadow-sm mb-3 sticky top-0 z-10 backdrop-blur-md bg-opacity-90">4. 什么画风 (风格)</div>
+                    <div class="flex flex-col gap-2 puzzle-group" id="group-style"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-8 bg-white px-6 py-4 rounded-full shadow-md text-gray-600 font-medium text-sm flex items-center gap-4 flex-wrap justify-center border border-gray-100">
+        <span class="text-blue-600 font-bold">🪄 复制咒语后，请选择召唤魔法师：</span>
+        <a href="https://jimeng.jianying.com/" target="_blank" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-full hover:shadow-lg transition">🚀 即梦 (Jimeng)</a>
+        <a href="https://www.doubao.com" target="_blank" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full hover:shadow-lg transition">🤖 豆包 (Doubao)</a>
+        <a href="https://tongyi.aliyun.com/wanxiang" target="_blank" class="px-4 py-2 bg-gradient-to-r from-orange-400 to-red-500 text-white rounded-full hover:shadow-lg transition">🎨 通义万相</a>
+    </div>
+
+    <script>
+        // === 20个选项数据库 ===
+        const subjects = [
+            { label: "🤖 可爱小机器人", prompt: "一个胖乎乎的可爱小机器人" },
+            { label: "👦 戴草帽小男孩", prompt: "一名戴着草帽的勤劳小男孩" },
+            { label: "🐶 安全帽小狗", prompt: "一只戴着黄色安全帽的聪明小狗" },
+            { label: "👩‍🚀 银色宇航员", prompt: "一名穿着亮银色宇航服的宇航员" },
+            { label: "🐼 围裙功夫熊猫", prompt: "一只系着白围裙的功夫熊猫" },
+            { label: "🐱 机械翅膀小猫", prompt: "一只长着发光机械翅膀的赛博小猫" },
+            { label: "🐙 万能大章鱼", prompt: "一只拥有八个触手的万能章鱼" },
+            { label: "🦖 眼镜小恐龙", prompt: "一只戴着黑框眼镜的绿色小恐龙" },
+            { label: "👧 勇敢小女孩", prompt: "一名扎着双马尾的勇敢小女孩" },
+            { label: "🐻 背带裤小熊", prompt: "一只穿着蓝色牛仔背带裤的小棕熊" },
+            { label: "🦊 发明家小狐狸", prompt: "一只戴着护目镜的发明家小狐狸" },
+            { label: "🐰 侦探长耳朵兔", prompt: "一只拿着放大镜的侦探长耳朵兔" },
+            { label: "🦉 博士帽猫头鹰", prompt: "一只戴着博士帽的智慧猫头鹰" },
+            { label: "🐘 消防员小象", prompt: "一只穿着消防服的可爱小象" },
+            { label: "🦄 发光独角兽", prompt: "一只身上散发着点点星光的独角兽" },
+            { label: "🐧 滑雪服企鹅", prompt: "一只穿着厚厚滑雪服的小企鹅" },
+            { label: "🐸 荷叶伞青蛙", prompt: "一只举着巨大荷叶当伞的小青蛙" },
+            { label: "🦁 列车长狮子", prompt: "一只穿着制服的威风狮子列车长" },
+            { label: "🐢 旅行小乌龟", prompt: "一只背上驮着一座小房子的旅行龟" },
+            { label: "🐹 飞行员仓鼠", prompt: "一只戴着飞行员皮帽的小仓鼠" }
+        ];
+
+        const envs = [
+            { label: "🌻 阳光未来农场", prompt: "在一个阳光明媚的未来高科技农场里" },
+            { label: "🏭 赛博齿轮工厂", prompt: "在一个充满巨大发光齿轮的赛博工厂中" },
+            { label: "🌌 太空植物温室", prompt: "在一座漂浮在太空的半透明植物温室里" },
+            { label: "🍳 干净智能厨房", prompt: "在一个干净整洁、充满全息投影的智能厨房里" },
+            { label: "🏙️ 云端天空之城", prompt: "在一座悬浮在软绵绵白云之上的天空之城里" },
+            { label: "🌊 海底珊瑚实验室", prompt: "在一个长满彩色发光珊瑚的海底实验室里" },
+            { label: "🌲 巨大蘑菇森林", prompt: "在一片长满巨大彩色蘑菇的魔法森林中" },
+            { label: "🏜️ 火星红色营地", prompt: "在一个建立在火星表面的红色探测营地里" },
+            { label: "🏰 悬崖糖果城堡", prompt: "在一座建在悬崖边的梦幻糖果城堡前" },
+            { label: "🧊 极地冰雕世界", prompt: "在一个完全由晶莹剔透的冰雕组成的极地世界里" },
+            { label: "🌋 彩色泡泡火山", prompt: "在一座不断喷发着彩色肥皂泡泡的奇妙火山旁" },
+            { label: "📚 魔法飞行图书馆", prompt: "在一个书本会自己长翅膀飞翔的魔法图书馆里" },
+            { label: "🎢 树冠游乐园", prompt: "在一个建立在巨大树冠之上的木制游乐园里" },
+            { label: "🛤️ 银河星空列车", prompt: "在一列正穿梭于璀璨星空中的银河列车车厢内" },
+            { label: "🏝️ 巨大水果岛屿", prompt: "在一座漂浮着各种巨大水果的奇幻海岛上" },
+            { label: "🎪 机器人马戏团", prompt: "在一个充满笑声和五彩灯光的机器人马戏团帐篷里" },
+            { label: "🏡 巨型南瓜小屋", prompt: "在一个由巨型南瓜挖空做成的温馨小屋里" },
+            { label: "💎 闪烁水晶洞穴", prompt: "在一个四周墙壁都闪烁着蓝色水晶光芒的地下洞穴中" },
+            { label: "🌙 月球陨石坑基地", prompt: "在一个建立在巨大月球陨石坑里的半球形基地中" },
+            { label: "🌈 横跨云海彩虹桥", prompt: "在一座横跨在无边无际云海之上的彩虹桥上" }
+        ];
+
+        const actions = [
+            { label: "🍎 开心摘苹果", prompt: "正伸出双手开心地采摘红彤彤的苹果，旁边有蝴蝶飞舞" },
+            { label: "🔧 认真修机器", prompt: "手里拿着发光的扳手正在修理一台坏掉的机器，额头上有汗水" },
+            { label: "🧹 魔法大扫除", prompt: "拿着一把魔法扫把，正在把地面打扫得闪闪发光，表情很自豪" },
+            { label: "🎂 端着热蛋糕", prompt: "小心翼翼地端着一盘刚烤好的大蛋糕，蛋糕散发着热气，看起来很好吃" },
+            { label: "🌱 给发光树浇水", prompt: "正拿着水壶，小心翼翼地给一株发光的魔法小树苗浇水，满眼期待" },
+            { label: "📦 踩滑板送快递", prompt: "踩着悬浮滑板穿梭，给邻居们派送快递包裹，速度快得留下了光影" },
+            { label: "🎨 挥动画笔画彩虹", prompt: "拿着一把巨大的画笔，正在给灰色的墙壁画上一道绚丽的彩虹" },
+            { label: "🍳 炒出星星火花", prompt: "正熟练地翻炒锅里的神奇料理，锅里冒出星星和彩色火花，非常酷炫" },
+            { label: "🔍 观察发光脚印", prompt: "拿着放大镜，趴在地上仔细观察着一串神秘的发光脚印" },
+            { label: "🎵 弹奏彩色吉他", prompt: "正在弹奏一把吉他，吉他的琴弦上喷涌出五颜六色的音乐符号" },
+            { label: "🚀 喷射背包升空", prompt: "背着火箭喷射背包，拉出一道长长的尾焰，正准备一飞冲天" },
+            { label: "📸 给流星拍照", prompt: "举着一台复古照相机，正准备给夜空中路过的流星抓拍照片" },
+            { label: "📖 阅读悬浮魔法书", prompt: "戴着大大的眼镜，正在专心致志地阅读一本漂浮在半空中的发光魔法书" },
+            { label: "🎣 坐在云朵上钓鱼", prompt: "惬意地坐在软绵绵的云朵上，用钓鱼竿从云海里钓起了一颗星星" },
+            { label: "🧪 摇晃彩色试管", prompt: "正聚精会神地摇晃着手里五颜六色、不断冒着彩色泡泡的化学试管" },
+            { label: "🎁 拆开神秘礼物", prompt: "正开心地拆开一个散发着金色光芒的神秘礼物盲盒，表情十分惊喜" },
+            { label: "🚲 骑着光环自行车", prompt: "正用力蹬着一辆自行车，自行车的轮子是由绚丽的彩色光环组成的" },
+            { label: "🪁 放飞恐龙风筝", prompt: "正迎着微风奔跑，手里牵着线，放飞一个巨大的霸王龙形状的风筝" },
+            { label: "💻 敲击全息键盘", prompt: "手指飞快地在半空中的全息虚拟键盘上敲击代码，眼神非常专注" },
+            { label: "💤 躺在云上睡午觉", prompt: "躺在像棉花糖一样柔软的云朵上，盖着毯子，正舒服地打着呼噜睡午觉" }
+        ];
+
+        const styles = [
+            { label: "🎨 皮克斯 3D", prompt: "皮克斯3D动画风格，色彩鲜艳，光影温暖，高画质，杰作。" },
+            { label: "🌿 宫崎骏动漫", prompt: "宫崎骏吉卜力动漫风格，清新自然，生机勃勃，美丽的风景，壁纸级别。" },
+            { label: "🖌️ 治愈水彩画", prompt: "治愈系儿童绘本水彩画风格，色彩柔和过度，充满梦幻和童话的感觉。" },
+            { label: "🧱 乐高积木风", prompt: "乐高积木风格，画面里的所有人物和风景都是由塑料乐高方块拼成的，极具创意。" },
+            { label: "👾 8-bit 像素", prompt: "8-bit像素游戏风格，充满复古感，颜色对比强烈，像经典的红白机电子游戏。" },
+            { label: "🚀 赛博朋克", prompt: "赛博朋克风格，夜晚的霓虹灯光效，充满未来高科技感，画面超级酷炫。" },
+            { label: "🖍️ 蜡笔涂鸦", prompt: "幼儿园蜡笔涂鸦风格，笔触充满童真，色彩丰富且充满天马行空的想象力。" },
+            { label: "✂️ 立体剪纸", prompt: "层叠剪纸艺术风格，画面像是由一层层不同颜色的彩纸雕刻叠加出来的，立体感极强。" },
+            { label: "🧶 毛线编织", prompt: "毛线粗针编织风格，画面里的一切看起来都是毛茸茸的针织质感，非常温暖可爱。" },
+            { label: "🧊 晶莹水晶", prompt: "晶莹剔透的水晶玻璃风格，画面中的元素像琉璃一样半透明且折射着闪闪发光的光线。" },
+            { label: "🌟 盲盒手办", prompt: "Q版盲盒潮玩手办风格，人物比例可爱，表面具有精致的PVC塑料反光质感。" },
+            { label: "🖼️ 中国水墨", prompt: "新中式水墨画风格，黑白灰的飘逸笔触中点缀着鲜艳的色彩，充满诗意和意境。" },
+            { label: "🎇 梵高星空", prompt: "梵高油画风格，色彩运用极其大胆，画面充满旋转和流动的笔触，极具艺术表现力。" },
+            { label: "🌃 唯美平涂", prompt: "日系唯美赛璐璐平涂风格，线条清晰明快，光影干净利落，像精美的动漫海报。" },
+            { label: "泥 黏土定格", prompt: "黏土定格动画风格，人物和场景具有手工捏制黏土的质感，带有一点点可爱的笨拙感。" },
+            { label: "🌸 浮世绘", prompt: "日本传统浮世绘版画风格，经典的波浪图案和樱花元素，具有浓厚的古典复古韵味。" },
+            { label: "✏️ 铅笔素描", prompt: "精致的黑白铅笔素描风格，排线细腻，光影体积感强，如同美术大师的手稿。" },
+            { label: "✨ 霓虹线稿", prompt: "暗黑背景下的发光霓虹线稿风格，纯黑的背景衬托出五彩斑斓的发光线条轮廓。" },
+            { label: "📸 极简几何", prompt: "极简主义矢量插画风格，画面由干净的扁平化几何图形拼接而成，没有多余的细节。" },
+            { label: "🦄 绚丽极光", prompt: "极光渐变风格，整个画面笼罩在紫粉色和青蓝色的梦幻极光氛围中，空灵绝美。" }
+        ];
+
+        // 状态存储
+        let currentPrompt = { subject: "", env: "", action: "", style: "" };
+
+        // 动态生成按钮的函数
+        function renderButtons(containerId, category, dataArray, colorClass) {
+            const container = document.getElementById(containerId);
+            let html = '';
+            dataArray.forEach((item) => {
+                // 转义处理避免引号冲突
+                const promptText = item.prompt.replace(/'/g, "\\'");
+                html += `
+                    <button onclick="selectItem('${category}', '${promptText}', this, '${colorClass}')" 
+                            class="puzzle-btn bg-gray-50 border-2 border-transparent text-left p-3 rounded-xl hover:border-${colorClass}-300 hover:bg-${colorClass}-50 transition text-sm font-medium text-gray-700">
+                        ${item.label}
+                    </button>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        // 页面加载时渲染所有按钮
+        window.onload = function() {
+            renderButtons('group-subject', 'subject', subjects, 'red');
+            renderButtons('group-env', 'env', envs, 'blue');
+            renderButtons('group-action', 'action', actions, 'orange');
+            renderButtons('group-style', 'style', styles, 'purple');
+        };
+
+        function selectItem(category, text, btnElement, colorClass) {
+            currentPrompt[category] = text;
+
+            const group = document.getElementById(`group-${category}`);
+            const buttons = group.getElementsByTagName('button');
+            for (let btn of buttons) {
+                btn.classList.remove('btn-selected');
+                // 恢复默认颜色
+                btn.classList.remove(`bg-${colorClass}-50`);
+            }
+            
+            btnElement.classList.add('btn-selected');
+            btnElement.classList.add(`bg-${colorClass}-50`);
+
+            updateDisplay();
+            resetCopyButton();
+        }
+
+        function updateDisplay() {
+            const display = document.getElementById('prompt-display');
+            
+            if (!currentPrompt.subject && !currentPrompt.env && !currentPrompt.action && !currentPrompt.style) {
+                display.innerHTML = '<span class="text-gray-300 italic">请在下方选择拼图块...</span>';
+                return;
+            }
+
+            let finalPrompt = "";
+            if (currentPrompt.subject) finalPrompt += `<span class="text-red-500 font-bold">${currentPrompt.subject}</span>，`;
+            if (currentPrompt.env) finalPrompt += `<span class="text-blue-500">${currentPrompt.env}</span>，`;
+            if (currentPrompt.action) finalPrompt += `<span class="text-orange-500">${currentPrompt.action}</span>。`;
+            if (currentPrompt.style) finalPrompt += `<br><span class="text-purple-500 mt-2 block">【画风要求】：${currentPrompt.style}</span>`;
+
+            display.innerHTML = finalPrompt;
+        }
+
+        function clearPrompt() {
+            currentPrompt = { subject: "", env: "", action: "", style: "" };
+            const allButtons = document.querySelectorAll('.puzzle-btn');
+            allButtons.forEach(btn => {
+                btn.classList.remove('btn-selected');
+                // 移除可能的选中背景色
+                btn.classList.remove('bg-red-50', 'bg-blue-50', 'bg-orange-50', 'bg-purple-50');
+            });
+            updateDisplay();
+            resetCopyButton();
+        }
+
+        function copyPrompt() {
+            let rawText = "";
+            if (currentPrompt.subject) rawText += currentPrompt.subject + "，";
+            if (currentPrompt.env) rawText += currentPrompt.env + "，";
+            if (currentPrompt.action) rawText += currentPrompt.action + "。";
+            if (currentPrompt.style) rawText += "画风要求：" + currentPrompt.style;
+
+            if (rawText === "") {
+                alert("你还没有拼接任何咒语哦！");
+                return;
+            }
+
+            navigator.clipboard.writeText(rawText).then(() => {
+                const copyBtn = document.getElementById('copy-btn');
+                const copyText = document.getElementById('copy-text');
+                copyBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                copyBtn.classList.add('bg-blue-500', 'hover:bg-blue-600');
+                copyText.innerText = "复制成功！快去粘贴吧";
+            }).catch(err => {
+                alert("复制失败，请手动选中文字复制。");
+            });
+        }
+
+        function resetCopyButton() {
+            const copyBtn = document.getElementById('copy-btn');
+            const copyText = document.getElementById('copy-text');
+            copyBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            copyBtn.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+            copyText.innerText = "一键复制咒语";
+        }
+    </script>
+</body>
+</html>
