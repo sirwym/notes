@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 面部特征实验室 - 大中信奥</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/facemesh"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .kid-font { font-family: 'ZCOOL KuaiLe', cursive; }
+        .loading-overlay { display: flex; }
+        .loaded .loading-overlay { display: none; }
+        .mirror { transform: scaleX(-1); }
+        .aspect-video { aspect-ratio: 16 / 9; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-cyan-50 min-h-screen p-4 md:p-8">
+
+    <div id="loader" class="loading-overlay fixed inset-0 bg-cyan-800 z-50 flex-col items-center justify-center text-white">
+        <p class="text-lg text-cyan-200">正在加载 468 点面部雷达系统...</p>
+    </div>
+
+    <div class="max-w-6xl mx-auto">
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl font-bold text-cyan-800 kid-font mb-2">大中信奥 · 面部表情雷达</h1>
+            <p class="text-cyan-600 font-medium text-lg">AI 正在用 468 个光点绘制你的脸庞！</p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+            
+            <div class="md:col-span-4 flex flex-col gap-4 h-[calc(100vh-160px)]">
+                <div class="bg-white p-6 rounded-3xl shadow-lg border-4 border-white flex-1 overflow-y-auto no-scrollbar">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold text-gray-700 flex items-center">
+                            <span class="mr-2">😜</span> 训练表情
+                        </h2>
+                        <button onclick="addCategory()" class="text-cyan-600 hover:text-cyan-700 bg-cyan-50 hover:bg-cyan-100 px-3 py-1 rounded-full text-sm font-bold transition">
+                            + 新表情
+                        </button>
+                    </div>
+                    <div id="categoriesContainer" class="space-y-4"></div>
+                </div>
+
+                <div class="bg-gradient-to-br from-purple-500 to-indigo-600 p-6 rounded-3xl shadow-lg text-white flex-shrink-0">
+                    <h2 class="text-lg font-bold mb-4 flex items-center">
+                        <span class="mr-2">💾</span> 面部记忆芯片
+                    </h2>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="downloadModel()" class="bg-white/20 hover:bg-white/30 p-3 rounded-2xl text-sm transition font-bold border border-white/30">
+                            封存 AI 能量
+                        </button>
+                        <label class="bg-white/20 hover:bg-white/30 p-3 rounded-2xl text-sm transition font-bold border border-white/30 cursor-pointer text-center">
+                            唤醒 AI 记忆
+                            <input type="file" accept=".json" onchange="importModel(this.files[0])" class="hidden">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="md:col-span-8 flex flex-col gap-4">
+                <div class="bg-white p-4 rounded-3xl shadow-xl border-8 border-cyan-100 relative">
+                    <div class="rounded-2xl overflow-hidden bg-gray-900 aspect-video relative">
+                        <video autoplay playsinline muted id="webcam" class="absolute inset-0 w-full h-full object-cover mirror"></video>
+                        <canvas id="output_canvas" class="absolute inset-0 w-full h-full object-cover mirror z-10"></canvas>
+                        
+                        <div id="mood-bubble" class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-white px-8 py-3 rounded-full shadow-2xl text-3xl hidden transition-all scale-0 z-20 font-bold text-cyan-600 kid-font">
+                            判定中...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-3xl shadow-lg border-4 border-white">
+                    <h2 class="text-lg font-bold text-gray-700 mb-4 kid-font">🔍 机器人的心里话：</h2>
+                    <div id="predictionBarsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        let faceModel;
+        const classifier = knnClassifier.create();
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('output_canvas');
+        const ctx = canvas.getContext('2d');
+        let isAdding = false;
+        let currentClassId = null;
+
+        const colorPalette = ['#06b6d4', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#ef4444'];
+        const iconPalette = ['😁', '😲', '😡', '😎', '😜', '😭'];
+        let nextCatId = 2;
+
+        // 默认保留两个表情分类
+        let categories = [
+            { id: 'cat_0', name: '大笑', color: '#06b6d4', count: 0, icon: '😁' },
+            { id: 'cat_1', name: '惊讶', color: '#8b5cf6', count: 0, icon: '😲' }
+        ];
+
+        function addCategory() {
+            if (categories.length >= 6) {
+                alert("最多只能添加 6 个表情哦！");
+                return;
+            }
+            const newId = `cat_${nextCatId++}`;
+            const color = colorPalette[nextCatId % colorPalette.length];
+            const icon = iconPalette[nextCatId % iconPalette.length];
+            categories.push({ id: newId, name: `新表情 ${categories.length}`, color: color, count: 0, icon: icon });
+            renderUI();
+        }
+
+        function deleteCategory(id) {
+            if (categories.length <= 1) {
+                alert("至少保留一个表情吧！");
+                return;
+            }
+            if (confirm("确定要删除这个表情和它的所有记忆吗？")) {
+                categories = categories.filter(c => c.id !== id);
+                try { classifier.clearClass(id); } catch(e) {}
+                renderUI();
+            }
+        }
+
+        function renderUI() {
+            const container = document.getElementById('categoriesContainer');
+            container.innerHTML = categories.map(cat => `
+                <div class="p-4 rounded-2xl border-2 transition-all bg-gray-50 border-gray-100 hover:border-gray-300 relative group">
+                    <button onclick="deleteCategory('${cat.id}')" class="absolute -top-2 -right-2 bg-red-100 text-red-500 hover:bg-red-500 hover:text-white w-6 h-6 rounded-full text-xs font-bold opacity-0 group-hover:opacity-100 transition shadow-sm flex items-center justify-center">×</button>
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-2xl">${cat.icon}</span>
+                        <input type="text" value="${cat.name}" onchange="updateName('${cat.id}', this.value)" 
+                               class="bg-transparent border-b-2 border-dashed font-bold text-gray-700 focus:outline-none w-24 text-center">
+                        <span class="text-xs font-bold text-cyan-500 bg-cyan-50 px-2 py-1 rounded-full" id="count-${cat.id}">${cat.count} 张</span>
+                    </div>
+                    <button 
+                        onmousedown="startAdd('${cat.id}')" onmouseup="stopAdd()" onmouseleave="stopAdd()"
+                        ontouchstart="startAdd('${cat.id}'); event.preventDefault();" ontouchend="stopAdd()"
+                        class="w-full py-3 rounded-xl text-white font-bold transition active:scale-95 shadow-md" 
+                        style="background: ${cat.color}">
+                        长按录入特征
+                    </button>
+                </div>
+            `).join('');
+
+            const barContainer = document.getElementById('predictionBarsContainer');
+            barContainer.innerHTML = categories.map(cat => `
+                <div>
+                    <div class="flex justify-between text-sm font-bold mb-2" style="color: ${cat.color}">
+                        <span>${cat.name}</span>
+                        <span id="prob-${cat.id}">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-100 rounded-full h-3 overflow-hidden shadow-inner">
+                        <div id="bar-${cat.id}" class="h-full transition-all duration-200" style="width: 0%; background: ${cat.color}"></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateName(id, val) {
+            const cat = categories.find(c => c.id === id);
+            if(cat) cat.name = val;
+            renderUI(); 
+        }
+
+        function startAdd(id) { isAdding = true; currentClassId = id; }
+        function stopAdd() { isAdding = false; }
+
+        // 绘制人脸特征点
+        function drawFace(scaledMesh) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // 给脸上的 468 个点画上星星
+            ctx.fillStyle = "#22d3ee"; // 亮青色
+            for (let i = 0; i < scaledMesh.length; i++) {
+                const x = scaledMesh[i][0];
+                const y = scaledMesh[i][1];
+                ctx.beginPath();
+                ctx.arc(x, y, 1.5, 0, 2 * Math.PI); // 1.5像素的小点
+                ctx.fill();
+            }
+        }
+
+        async function downloadModel() {
+            const dataset = classifier.getClassifierDataset();
+            if (Object.keys(dataset).length === 0) return alert("先教我几个表情吧！");
+            const data = { categories, dataset: {} };
+            for (const [key, tensor] of Object.entries(dataset)) {
+                data.dataset[key] = Array.from(await tensor.data());
+            }
+            const blob = new Blob([JSON.stringify(data)], {type: 'application/json'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `面部密码芯片-${new Date().getTime()}.json`;
+            a.click();
+        }
+
+        function importModel(file) {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const data = JSON.parse(e.target.result);
+                const newDataset = {};
+                for (const [key, val] of Object.entries(data.dataset)) {
+                    // 面网模型有 468 个点，每个点有 [x, y, z] 3 个坐标
+                    // 所以特征总长度是 468 * 3 = 1404
+                    newDataset[key] = tf.tensor2d(val, [val.length / 1404, 1404]);
+                }
+                classifier.setClassifierDataset(newDataset);
+                categories = data.categories;
+                
+                let maxId = 0;
+                categories.forEach(c => {
+                    const num = parseInt(c.id.replace('cat_', ''));
+                    if (num > maxId) maxId = num;
+                });
+                nextCatId = maxId + 1;
+
+                renderUI();
+                alert("记忆唤醒成功！快做个表情试试吧！");
+            };
+            reader.readAsText(file);
+        }
+
+        async function app() {
+            try {
+                // 加载 Facemesh 模型
+                faceModel = await facemesh.load();
+                document.body.classList.add('loaded');
+                
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = () => {
+                    video.play();
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                };
+
+                renderUI();
+                const moodBubble = document.getElementById('mood-bubble');
+
+                while (true) {
+                    if (video.readyState === 4) {
+                        const predictions = await faceModel.estimateFaces(video);
+
+                        if (predictions.length > 0) {
+                            const mesh = predictions[0].scaledMesh;
+                            
+                            // 在画面上画出网格
+                            drawFace(mesh);
+
+                            // 提取 468 个点的 3D 坐标并扁平化 (1404 个数字)
+                            const features = mesh.flat();
+                            const tensor = tf.tensor1d(features);
+
+                            if (isAdding && currentClassId) {
+                                classifier.addExample(tensor, currentClassId);
+                                const cat = categories.find(c => c.id === currentClassId);
+                                cat.count++;
+                                document.getElementById(`count-${cat.id}`).innerText = `${cat.count} 张`;
+                            }
+
+                            if (classifier.getNumClasses() > 0) {
+                                const result = await classifier.predictClass(tensor);
+                                let maxProb = 0;
+                                let bestCat = null;
+
+                                categories.forEach(cat => {
+                                    const prob = result.confidences[cat.id] || 0;
+                                    document.getElementById(`prob-${cat.id}`).innerText = `${Math.floor(prob*100)}%`;
+                                    document.getElementById(`bar-${cat.id}`).style.width = `${prob*100}%`;
+                                    if(prob > maxProb) { maxProb = prob; bestCat = cat; }
+                                });
+
+                                if (maxProb > 0.8) {
+                                    moodBubble.innerText = `${bestCat.icon} ${bestCat.name}`;
+                                    moodBubble.style.display = 'block';
+                                    moodBubble.style.transform = 'translate(-50%, 0) scale(1)';
+                                    moodBubble.style.color = bestCat.color;
+                                } else {
+                                    moodBubble.style.transform = 'translate(-50%, 0) scale(0)';
+                                }
+                            }
+                        } else {
+                            // 如果没检测到脸
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                            moodBubble.style.transform = 'translate(-50%, 0) scale(0)';
+                            categories.forEach(cat => {
+                                const bar = document.getElementById(`bar-${cat.id}`);
+                                const prob = document.getElementById(`prob-${cat.id}`);
+                                if (bar && prob) {
+                                    bar.style.width = '0%';
+                                    prob.innerText = '0%';
+                                }
+                            });
+                        }
+                    }
+                    await tf.nextFrame();
+                }
+            } catch (error) {
+                console.error("模型加载或运行失败:", error);
+                alert("加载失败，请确保授予了摄像头权限，并检查网络连接。");
+            }
+        }
+        app();
+    </script>
+</body>
+</html>

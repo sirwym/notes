@@ -3,65 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 图像分类小课堂 · 精准版</title>
+    <title>AI 视觉实验室 - 大中信奥</title>
+
     <script src="https://cdn.jsdelivr.net/gh/sirwym/notes@main/assets/js/tailwind.js"
             onerror="this.onerror=null;this.src='../assets/js/tailwind.js'"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
+    </style>
+
     <script src="https://cdn.jsdelivr.net/gh/sirwym/notes@main/assets/js/tf.min.js"
             onerror="this.onerror=null;this.src='../assets/js/tf.min.js'"></script>
     <script src="https://cdn.jsdelivr.net/gh/sirwym/notes@main/assets/js/knn-classifier.min.js"
             onerror="this.onerror=null;this.src='../assets/js/knn-classifier.min.js'"></script>
+
     <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .kid-font { font-family: 'ZCOOL KuaiLe', cursive; }
         .loading-overlay { display: flex; }
         .loaded .loading-overlay { display: none; }
+        .mirror { transform: scaleX(-1); }
+        .aspect-video { aspect-ratio: 16 / 9; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen p-4 md:p-8">
+<body class="bg-emerald-50 min-h-screen p-4 md:p-8">
 
-    <div id="loader" class="loading-overlay fixed inset-0 bg-white z-50 flex-col items-center justify-center">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mb-4"></div>
-        <p class="text-gray-600">正在唤醒 AI 大脑，请稍候...</p>
+    <div id="loader" class="loading-overlay fixed inset-0 bg-emerald-700 z-50 flex-col items-center justify-center text-white">
+        <p class="text-lg text-emerald-200">正在唤醒 AI 大脑，请稍候...</p>
     </div>
 
     <div class="max-w-6xl mx-auto">
         <header class="mb-8 text-center">
-            <h1 class="text-3xl font-bold text-gray-800">AI 视觉实验室</h1>
-            <p class="text-gray-500 mt-2">点击拍照教机器人认识物体 · 感受 AI 视界</p>
+            <h1 class="text-4xl font-bold text-emerald-800 kid-font mb-2">大中信奥 · AI 视觉实验室</h1>
+            <p class="text-emerald-600 font-medium text-lg">拍照教 AI 认识万物 · 感受 KNN 图像分类的魅力</p>
         </header>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            
-            <div class="space-y-6" id="categoriesContainer"></div>
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
 
-            <div class="bg-white p-4 rounded-2xl shadow-md border-2 border-green-100 relative">
-                <div class="rounded-xl overflow-hidden bg-gray-200 aspect-video flex items-center justify-center relative">
-                    <video autoplay playsinline muted id="webcam" class="w-full h-full object-cover transform -scale-x-100"></video>
-                    <div id="flashOverlay" class="absolute inset-0 bg-white opacity-0 pointer-events-none transition-opacity duration-75"></div>
+            <div class="md:col-span-4 flex flex-col gap-4 h-[calc(100vh-160px)]">
+                <div class="bg-white p-6 rounded-3xl shadow-lg border-4 border-white flex-1 overflow-y-auto no-scrollbar">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold text-gray-700 flex items-center">
+                            <span class="mr-2">📸</span> 训练分类
+                        </h2>
+                        <button onclick="addNewCategory()" class="text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded-full text-sm font-bold transition">
+                            + 新分类
+                        </button>
+                    </div>
+                    <div id="categoriesContainer" class="space-y-4"></div>
                 </div>
-                <div class="mt-4 text-center">
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        <span class="w-2 h-2 bg-green-500 rounded-full animate-ping mr-2"></span>
-                        AI 正在观察中...
-                    </span>
+
+                <div class="bg-gradient-to-br from-emerald-500 to-teal-600 p-6 rounded-3xl shadow-lg text-white flex-shrink-0">
+                    <h2 class="text-lg font-bold mb-4 flex items-center">
+                        <span class="mr-2">💾</span> 视觉记忆芯片
+                    </h2>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="downloadModel()" class="bg-white/20 hover:bg-white/30 p-3 rounded-2xl text-sm transition font-bold border border-white/30">
+                            封存 AI 能量
+                        </button>
+                        <label class="bg-white/20 hover:bg-white/30 p-3 rounded-2xl text-sm transition font-bold border border-white/30 cursor-pointer text-center">
+                            唤醒 AI 记忆
+                            <input type="file" accept=".json" onchange="importModel(this.files[0])" class="hidden">
+                        </label>
+                    </div>
                 </div>
             </div>
 
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-                <h2 class="font-bold text-gray-800 mb-6 flex items-center">
-                    置信度预测
-                    <span class="ml-2 text-xs font-normal text-gray-400">(AI 的猜想)</span>
-                </h2>
-                <div id="predictionBarsContainer" class="space-y-8 flex-1"></div>
-                <div id="conclusion" class="mt-8 p-4 rounded-xl bg-gray-50 border border-dashed border-gray-200 text-center text-gray-500 italic text-sm">
-                    💡 提示：要想 AI 变聪明，请先把空桌子、你的手、水杯等杂物，都拍几张存进【杂物/背景】里哦！
+            <div class="md:col-span-8 flex flex-col gap-4">
+                <div class="bg-white p-4 rounded-3xl shadow-xl border-8 border-emerald-100 relative">
+                    <div class="rounded-2xl overflow-hidden bg-gray-900 aspect-video relative">
+                        <video autoplay playsinline muted id="webcam" class="absolute inset-0 w-full h-full object-cover mirror"></video>
+                        <div id="flashOverlay" class="absolute inset-0 bg-white opacity-0 pointer-events-none transition-opacity duration-75 z-10"></div>
+
+                        <div id="mood-bubble" class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-white px-8 py-3 rounded-full shadow-2xl text-2xl hidden transition-all scale-0 z-20 font-bold text-emerald-600 kid-font">
+                            判定中...
+                        </div>
+                    </div>
                 </div>
-                <div class="mt-4 flex gap-2">
-                    <button onclick="downloadModel()" class="flex-1 bg-amber-400 hover:bg-amber-500 text-white py-2 rounded-lg text-sm font-medium transition">
-                        📥 下载模型
-                    </button>
-                    <label class="flex-1 bg-sky-400 hover:bg-sky-500 text-white py-2 rounded-lg text-sm font-medium cursor-pointer text-center transition">
-                        📤 导入模型
-                        <input type="file" accept=".json" onchange="importModel(this.files[0])" class="hidden">
-                    </label>
+
+                <div class="bg-white p-6 rounded-3xl shadow-lg border-4 border-white">
+                    <h2 class="text-lg font-bold text-gray-700 mb-4 kid-font">🔍 机器人的心里话：</h2>
+                    <div id="predictionBarsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+                    <div id="conclusion" class="mt-6 p-4 rounded-2xl bg-emerald-50 border border-dashed border-emerald-200 text-center text-emerald-600 font-medium text-sm">
+                        💡 提示：要想 AI 变聪明，请先把空桌子、你的手、水杯等杂物，都拍几张存进【杂物/背景】里哦！
+                    </div>
                 </div>
             </div>
 
@@ -83,103 +110,98 @@
             return localPath;
         }
 
-        // ==================== 全局变量 ====================
         let net;
         const classifier = knnClassifier.create();
-        const webcamElement = document.getElementById('webcam');
+        const video = document.getElementById('webcam');
+        let isAdding = false;
+        let currentClassId = null;
+
+        const colorPalette = ['#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#10b981', '#f97316', '#6b7280'];
+        const iconPalette = ['🍎', '🥤', '📱', '📚', '✏️', '🔑', '🧸', '🎒'];
+        let nextCatId = 2;
 
         let categories = [
-            { id: 'cat_bg', name: '杂物 / 背景', color: 'gray', count: 0 },
-            { id: 'cat_0', name: '苹果 (示例)', color: 'red', count: 0 },
-            { id: 'cat_1', name: '水杯 (示例)', color: 'blue', count: 0 }
+            { id: 'cat_bg', name: '杂物 / 背景', color: '#6b7280', count: 0, icon: '🗑️' },
+            { id: 'cat_0',  name: '苹果 (示例)', color: '#ef4444', count: 0, icon: '🍎' },
+            { id: 'cat_1',  name: '水杯 (示例)', color: '#3b82f6', count: 0, icon: '🥤' }
         ];
-        let nextId = 2;
 
-        // ==================== UI 渲染函数 ====================
-        function renderCategories() {
+        function renderUI() {
             const container = document.getElementById('categoriesContainer');
-            container.innerHTML = '';
-            categories.forEach(cat => {
-                const card = document.createElement('div');
-                card.className = 'bg-white p-5 rounded-2xl shadow-sm border border-gray-100';
+            container.innerHTML = categories.map(cat => {
                 const isBg = cat.id === 'cat_bg';
-                const titleStyling = isBg ? 'text-gray-500 italic' : 'text-gray-700';
-                card.innerHTML = `
+                return `
+                <div class="p-4 rounded-2xl border-2 transition-all bg-gray-50 border-gray-100 hover:border-gray-300 relative group">
+                    <button onclick="deleteCategory('${cat.id}')" class="absolute -top-2 -right-2 bg-red-100 text-red-500 hover:bg-red-500 hover:text-white w-6 h-6 rounded-full text-xs font-bold opacity-0 group-hover:opacity-100 transition shadow-sm flex items-center justify-center" style="${isBg ? 'display:none' : ''}">×</button>
                     <div class="flex justify-between items-center mb-3">
+                        <span class="text-2xl">${cat.icon}</span>
                         <input type="text" value="${escapeHtml(cat.name)}"
-                               onchange="updateCategoryName('${cat.id}', this.value)"
-                               class="font-bold text-lg ${titleStyling} bg-transparent border-b border-dashed border-gray-300 focus:outline-none focus:border-${cat.color}-500 w-24 md:w-32">
-                        <span id="count-${cat.id}" class="text-xs bg-gray-100 px-2 py-1 rounded font-mono text-gray-500">${cat.count} 张</span>
+                               onchange="updateName('${cat.id}', this.value)"
+                               class="bg-transparent border-b-2 border-dashed font-bold text-gray-700 focus:outline-none w-24 text-center">
+                        <span class="text-xs font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-full" id="count-${cat.id}">${cat.count} 张</span>
                     </div>
                     <button
-                        onclick="addSingleExample('${cat.id}')"
-                        class="w-full text-white py-3 rounded-xl transition active:scale-95 font-medium shadow-sm hover:opacity-90"
-                        style="background-color: ${getColorCode(cat.color)};">
-                        📸 点击拍摄 ${isBg ? '手/环境/杂物' : escapeHtml(cat.name)}
+                        onmousedown="startAdd('${cat.id}')" onmouseup="stopAdd()" onmouseleave="stopAdd()"
+                        ontouchstart="startAdd('${cat.id}'); event.preventDefault();" ontouchend="stopAdd()"
+                        class="w-full py-3 rounded-xl text-white font-bold transition active:scale-95 shadow-md"
+                        style="background: ${cat.color}">
+                        长按录入特征
                     </button>
-                    <div class="flex justify-between mt-2">
+                    <div class="flex justify-end mt-2">
                         <button onclick="clearSingleCategorySamples('${cat.id}')" class="text-xs text-orange-400 hover:text-orange-600 transition">
                             🧹 清空本类照片
                         </button>
-                        ${!isBg ? `<button onclick="deleteCategory('${cat.id}')" class="text-xs text-red-400 hover:text-red-600 transition">🗑️ 删除分类</button>` : ''}
                     </div>
-                `;
-                container.appendChild(card);
-            });
-            const addBtn = document.createElement('button');
-            addBtn.onclick = addNewCategory;
-            addBtn.className = 'w-full border-2 border-dashed border-gray-300 text-gray-400 hover:text-green-500 py-3 rounded-xl transition mt-2';
-            addBtn.innerText = '+ 添加新分类';
-            container.appendChild(addBtn);
-        }
+                </div>`;
+            }).join('');
 
-        function renderPredictionBars() {
-            const container = document.getElementById('predictionBarsContainer');
-            container.innerHTML = '';
-            categories.forEach(cat => {
-                const div = document.createElement('div');
-                div.innerHTML = `
-                    <div class="flex justify-between mb-2">
-                        <span class="text-sm font-medium text-gray-600">${escapeHtml(cat.name)}</span>
-                        <span class="text-sm font-bold" style="color: ${getColorCode(cat.color)};" id="prob-${cat.id}">0%</span>
+            const barContainer = document.getElementById('predictionBarsContainer');
+            barContainer.innerHTML = categories.map(cat => `
+                <div>
+                    <div class="flex justify-between text-sm font-bold mb-2" style="color: ${cat.color}">
+                        <span>${cat.icon} ${cat.name}</span>
+                        <span id="prob-${cat.id}">0%</span>
                     </div>
-                    <div class="w-full bg-gray-100 rounded-full h-3">
-                        <div id="bar-${cat.id}" class="h-3 rounded-full transition-all duration-200" style="width: 0%; background-color: ${getColorCode(cat.color)};"></div>
+                    <div class="w-full bg-gray-100 rounded-full h-3 overflow-hidden shadow-inner">
+                        <div id="bar-${cat.id}" class="h-full transition-all duration-200" style="width: 0%; background: ${cat.color}"></div>
                     </div>
-                `;
-                container.appendChild(div);
-            });
-        }
-
-        function getColorCode(color) {
-            const map = { 'green':'#22c55e', 'blue':'#3b82f6', 'red':'#ef4444', 'purple':'#a855f7', 'yellow':'#eab308', 'pink':'#ec4899', 'orange':'#f97316', 'gray':'#9ca3af' };
-            return map[color] || '#6b7280';
+                </div>
+            `).join('');
         }
 
         function escapeHtml(text) {
             const div = document.createElement('div'); div.innerText = text; return div.innerHTML;
         }
 
-        function updateCategoryName(id, newName) {
+        function updateName(id, val) {
             const cat = categories.find(c => c.id === id);
-            if (cat) { cat.name = newName.trim() || cat.name; renderCategories(); renderPredictionBars(); }
+            if (cat) { cat.name = val.trim() || cat.name; renderUI(); }
         }
 
+        function startAdd(id) { isAdding = true; currentClassId = id; }
+        function stopAdd() { isAdding = false; }
+
         async function addNewCategory() {
-            if (categories.length >= 8) { alert('最多支持8个分类哦'); return; }
+            if (categories.length >= 8) { alert('最多支持8个分类哦！'); return; }
             const name = prompt('给分类起个名字吧：', `新分类 ${categories.length}`);
             if (!name) return;
-            categories.push({ id: `cat_${nextId++}`, name: name, color: ['purple','green','yellow','pink','orange'][categories.length-3]||'teal', count:0 });
-            renderCategories(); renderPredictionBars();
+            const idx = nextCatId % colorPalette.length;
+            categories.push({
+                id: `cat_${nextCatId++}`,
+                name: name,
+                color: colorPalette[idx],
+                count: 0,
+                icon: iconPalette[idx]
+            });
+            renderUI();
         }
 
         function deleteCategory(id) {
-            if (categories.length <= 2) { alert('至少保留一个具体分类'); return; }
+            if (categories.length <= 2) { alert('至少保留一个具体分类！'); return; }
             if (!confirm('确定删除？')) return;
             categories = categories.filter(c => c.id !== id);
             classifier.clearAllClasses();
-            categories.forEach(c => c.count = 0);
-            renderCategories(); renderPredictionBars();
+            renderUI();
         }
 
         function clearSingleCategorySamples(classId) {
@@ -195,31 +217,21 @@
             if (barEl) barEl.style.width = `0%`;
         }
 
-        function addSingleExample(classId) {
-            const activation = net.infer(webcamElement, 'conv_preds');
-            classifier.addExample(activation, classId);
-            const cat = categories.find(c => c.id === classId);
-            if (cat) { cat.count++; document.getElementById(`count-${classId}`).innerText = `${cat.count} 张`; }
-            const flash = document.getElementById('flashOverlay');
-            flash.style.opacity = '0.5';
-            setTimeout(() => { flash.style.opacity = '0'; }, 100);
-        }
-
         async function downloadModel() {
             const totalSamples = categories.reduce((sum, c) => sum + c.count, 0);
             if (totalSamples === 0) { alert('先拍几张照片吧！'); return; }
             const dataset = classifier.getClassifierDataset();
-            const dataToSave = { version: 3, categories: categories, dataset: {} };
+            const dataToSave = { categories, dataset: {} };
             for (const [label, tensor] of Object.entries(dataset)) {
                 dataToSave.dataset[label] = { shape: tensor.shape, data: await tensor.array() };
             }
             const blob = new Blob([JSON.stringify(dataToSave)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = 'ai-model.json';
+            const a = document.createElement('a'); a.href = url; a.download = 'ai-visual-model.json';
             document.body.appendChild(a); a.click(); document.body.removeChild(a);
         }
 
-        async function importModel(file) {
+        function importModel(file) {
             if (!file || !confirm('导入模型会覆盖当前所有记忆，确定吗？')) return;
             const reader = new FileReader();
             reader.onload = async (e) => {
@@ -232,13 +244,19 @@
                     classifier.clearAllClasses();
                     classifier.setClassifierDataset(newDataset);
                     categories = data.categories;
-                    renderCategories(); renderPredictionBars();
+                    let maxId = 0;
+                    categories.forEach(c => {
+                        const num = parseInt(c.id.replace('cat_', ''));
+                        if (num > maxId) maxId = num;
+                    });
+                    nextCatId = maxId + 1;
+                    renderUI();
+                    alert('记忆唤醒成功！');
                 } catch (err) { alert('导入失败，请检查文件格式。'); }
             };
             reader.readAsText(file);
         }
 
-        // ==================== 主程序 ====================
         async function app() {
             const loaderStatus = document.getElementById('status');
             try {
@@ -272,47 +290,68 @@
                 return;
             }
 
-            const setupWebcam = async () => {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                webcamElement.srcObject = stream;
-                return new Promise(resolve => webcamElement.onloadedmetadata = () => resolve());
-            };
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+            await new Promise(resolve => video.onloadedmetadata = () => { video.play(); resolve(); });
 
-            await setupWebcam();
-            renderCategories();
-            renderPredictionBars();
+            renderUI();
+            const moodBubble = document.getElementById('mood-bubble');
 
             while (true) {
-                if (classifier.getNumClasses() > 0) {
-                    const activation = net.infer(webcamElement, 'conv_preds');
-                    const result = await classifier.predictClass(activation, 3);
-                    let maxConf = 0, bestCat = null;
-                    categories.forEach(cat => {
-                        const prob = result.confidences[cat.id] || 0;
-                        const percent = Math.floor(prob * 100);
-                        const probEl = document.getElementById(`prob-${cat.id}`);
-                        const barEl = document.getElementById(`bar-${cat.id}`);
-                        if (probEl) probEl.innerText = `${percent}%`;
-                        if (barEl) barEl.style.width = `${percent}%`;
-                        if (prob > maxConf) { maxConf = prob; bestCat = cat; }
-                    });
-                    const conclusionEl = document.getElementById('conclusion');
-                    if (bestCat && bestCat.id === 'cat_bg' && maxConf > 0.4) {
-                        conclusionEl.innerText = '🤔 这是我不认识的东西，或者就是普通的背景。';
-                        conclusionEl.className = 'mt-8 p-4 rounded-xl bg-gray-50 border border-dashed border-gray-400 text-center text-gray-500 font-medium text-sm md:text-base';
-                    } else if (maxConf > 0.65 && bestCat) {
-                        conclusionEl.innerText = `💡 我觉得这看起来非常像【${bestCat.name}】！`;
-                        conclusionEl.className = 'mt-8 p-4 rounded-xl bg-green-50 border border-green-300 text-center text-green-700 font-bold shadow-sm text-sm md:text-base';
+                if (video.readyState === 4) {
+                    if (isAdding && currentClassId) {
+                        const activation = net.infer(video, 'conv_preds');
+                        classifier.addExample(activation, currentClassId);
+                        const cat = categories.find(c => c.id === currentClassId);
+                        if (cat) {
+                            cat.count++;
+                            document.getElementById(`count-${currentClassId}`).innerText = `${cat.count} 张`;
+                        }
+                        const flash = document.getElementById('flashOverlay');
+                        flash.style.opacity = '0.4';
+                        setTimeout(() => { flash.style.opacity = '0'; }, 100);
+                    }
+
+                    if (classifier.getNumClasses() > 0) {
+                        const activation = net.infer(video, 'conv_preds');
+                        const result = await classifier.predictClass(activation, 3);
+                        let maxConf = 0, bestCat = null;
+                        categories.forEach(cat => {
+                            const prob = result.confidences[cat.id] || 0;
+                            const percent = Math.floor(prob * 100);
+                            const probEl = document.getElementById(`prob-${cat.id}`);
+                            const barEl = document.getElementById(`bar-${cat.id}`);
+                            if (probEl) probEl.innerText = `${percent}%`;
+                            if (barEl) barEl.style.width = `${percent}%`;
+                            if (prob > maxConf) { maxConf = prob; bestCat = cat; }
+                        });
+
+                        if (bestCat && bestCat.id === 'cat_bg' && maxConf > 0.4) {
+                            moodBubble.innerText = '🤔 这是我不认识的东西';
+                            moodBubble.style.display = 'block';
+                            moodBubble.style.transform = 'translate(-50%, 0) scale(1)';
+                            moodBubble.style.color = '#6b7280';
+                        } else if (maxConf > 0.65 && bestCat) {
+                            moodBubble.innerText = `${bestCat.icon} ${bestCat.name}`;
+                            moodBubble.style.display = 'block';
+                            moodBubble.style.transform = 'translate(-50%, 0) scale(1)';
+                            moodBubble.style.color = bestCat.color;
+                        } else if (maxConf > 0.3 && bestCat) {
+                            moodBubble.innerText = '👀 不太确定是什么...';
+                            moodBubble.style.display = 'block';
+                            moodBubble.style.transform = 'translate(-50%, 0) scale(1)';
+                            moodBubble.style.color = '#f59e0b';
+                        } else {
+                            moodBubble.style.transform = 'translate(-50%, 0) scale(0)';
+                        }
                     } else {
-                        conclusionEl.innerText = '👀 哎呀，我有点眼花，不太确定这是什么...';
-                        conclusionEl.className = 'mt-8 p-4 rounded-xl bg-orange-50 border border-orange-300 text-center text-orange-600 font-medium text-sm md:text-base';
+                        moodBubble.style.transform = 'translate(-50%, 0) scale(0)';
                     }
                 }
                 await tf.nextFrame();
             }
         }
 
-        // ==================== 启动 ====================
         const loaderEl = document.querySelector('#loader p') || document.querySelector('#loader');
         loaderEl.innerHTML = '正在加载 AI 模型<span id="status"></span>，请稍候...';
         app();
