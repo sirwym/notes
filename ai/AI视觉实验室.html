@@ -70,15 +70,24 @@
         function loadScript(cdnPath, localPath, timeoutMs) {
             return new Promise((resolve, reject) => {
                 const s = document.createElement('script');
+                let resolved = false;
                 const timer = setTimeout(() => {
+                    if (resolved) return;
+                    resolved = true;
                     s.onload = s.onerror = null;
                     s.remove();
-                    reject(new Error('CDN timeout'));
+                    const fallback = document.createElement('script');
+                    fallback.src = localPath;
+                    fallback.onload = () => resolve();
+                    fallback.onerror = () => reject(new Error('local load failed: ' + localPath));
+                    document.head.appendChild(fallback);
                 }, timeoutMs || 5000);
                 s.src = cdnPath;
-                s.onload = () => { clearTimeout(timer); resolve(); };
+                s.onload = () => { clearTimeout(timer); if (!resolved) { resolved = true; resolve(); } };
                 s.onerror = () => {
                     clearTimeout(timer);
+                    if (resolved) return;
+                    resolved = true;
                     s.remove();
                     const fallback = document.createElement('script');
                     fallback.src = localPath;
@@ -91,15 +100,14 @@
         }
 
         async function loadModel(cdnPath, localPath) {
-            const ctrl = new AbortController();
-            const timer = setTimeout(() => ctrl.abort(), 5000);
             try {
-                const resp = await fetch(cdnPath, { signal: ctrl.signal });
-                clearTimeout(timer);
-                if (resp.ok) { document.getElementById('status').textContent = '已通过 CDN 加载模型'; return cdnPath; }
+                const resp = await Promise.race([
+                    fetch(cdnPath),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('CDN timeout')), 5000))
+                ]);
+                if (resp && resp.ok) { document.getElementById('status').textContent = '(已通过 CDN 加载)'; return cdnPath; }
             } catch (_) {}
-            clearTimeout(timer);
-            document.getElementById('status').textContent = 'CDN 超时，使用本地模型';
+            document.getElementById('status').textContent = '(使用本地模型)';
             return localPath;
         }
 
