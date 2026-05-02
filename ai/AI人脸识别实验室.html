@@ -5,15 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI 面部特征实验室</title>
     
-    <script src="https://cdn.tailwindcss.com"></script>
-    
+    <script src="https://cdn.jsdelivr.net/gh/sirwym/notes@main/assets/js/tailwind.js"
+            onerror="this.onerror=null;this.src='../assets/js/tailwind.js'"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
     </style>
 
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/facemesh"></script>
+    <script src="https://cdn.jsdelivr.net/gh/sirwym/notes@main/assets/js/tf.min.js"
+            onerror="this.onerror=null;this.src='../assets/js/tf.min.js'"></script>
+    <script src="https://cdn.jsdelivr.net/gh/sirwym/notes@main/assets/js/knn-classifier.min.js"
+            onerror="this.onerror=null;this.src='../assets/js/knn-classifier.min.js'"></script>
+    <script src="https://cdn.jsdelivr.net/gh/sirwym/notes@main/assets/js/facemesh.min.js"
+            onerror="this.onerror=null;this.src='../assets/js/facemesh.min.js'"></script>
     
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -91,6 +95,38 @@
     </div>
 
     <script>
+        const CDN = 'https://cdn.jsdelivr.net/gh/sirwym/notes@main';
+
+        async function loadModel(cdnPath, localPath) {
+            try {
+                const resp = await Promise.race([
+                    fetch(cdnPath),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('CDN timeout')), 5000))
+                ]);
+                if (resp && resp.ok) { return cdnPath; }
+            } catch (_) {}
+            return localPath;
+        }
+
+        const _loadGraphModel = tf.loadGraphModel;
+        tf.loadGraphModel = async function(url, opts) {
+            if (typeof url === 'string' && url.includes('tfhub.dev')) {
+                const maps = {
+                    'facemesh': CDN + '/assets/local_model/facemesh/model.json',
+                    'blazeface': CDN + '/assets/local_model/blazeface/model.json',
+                    'handdetector': CDN + '/assets/local_model/handdetector/model.json',
+                    'handskeleton': CDN + '/assets/local_model/handskeleton/model.json',
+                };
+                for (const [key, cdnPath] of Object.entries(maps)) {
+                    if (url.includes(key)) {
+                        const localPath = '../assets/local_model/' + key + '/model.json';
+                        const finalUrl = await loadModel(cdnPath, localPath);
+                        return _loadGraphModel(finalUrl);
+                    }
+                }
+            }
+            return _loadGraphModel(url, opts);
+        };
         let faceModel;
         const classifier = knnClassifier.create();
         const video = document.getElementById('webcam');
