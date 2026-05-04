@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>超级羊 · C++ 关键字特训 [VER 3.1]</title>
+    <style>
+        :root {
+            --bg: #ffffff;
+            --fg: #000000;
+            --gray: #888888;
+            --light-gray: #f5f5f5;
+            --border: 2px solid #000000;
+        }
+
+        body {
+            margin: 0; padding: 0; background-color: var(--light-gray);
+            font-family: 'Consolas', 'Courier New', monospace; color: var(--fg);
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; overflow: hidden; user-select: none;
+        }
+
+        /* 宽屏大尺寸机台 */
+        #game-container {
+            position: relative; width: 560px; height: 860px;
+            background: var(--bg); border: var(--border);
+            box-sizing: border-box; display: flex; flex-direction: column;
+        }
+
+        .hud { padding: 12px 20px; border-bottom: var(--border); display: flex; justify-content: space-between; align-items: center; font-weight: bold; background: #fff; z-index: 10; font-size: 1.1rem;}
+        .tools { padding: 12px; border-bottom: var(--border); display: flex; justify-content: center; gap: 25px; background: #fafafa; }
+        .tool-btn { padding: 8px 18px; border: var(--border); background: #fff; cursor: pointer; font-family: inherit; font-weight: bold; font-size: 1rem; transition: 0.1s; }
+        .tool-btn:hover:not(:disabled) { background: var(--fg); color: var(--bg); }
+        .tool-btn:disabled { border-color: #ccc; color: #ccc; cursor: not-allowed; }
+
+        .play-area { 
+            position: relative; flex: 1; width: 100%; 
+            background-image: linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
+            background-size: 20px 20px; overflow: hidden; 
+        }
+
+        /* 统一大字号卡片，彻底废弃缩小字体的CSS */
+        .card {
+            position: absolute; width: 72px; height: 84px; 
+            background: var(--bg); border: var(--border); border-radius: 6px; 
+            display: flex; justify-content: center; align-items: center; text-align: center;
+            font-size: 15px; font-weight: 800; color: var(--fg);
+            box-shadow: 1px 4px 0 #000; cursor: pointer; z-index: 1; transition: transform 0.1s;
+            padding: 4px; box-sizing: border-box; line-height: 1.2;
+        }
+
+        .card.covered { background: #e0e0e0; color: #999; border-color: #aaa; box-shadow: 1px 2px 0 #bbb; cursor: not-allowed; }
+        
+        .dock-container { height: 130px; border-top: var(--border); background: var(--light-gray); display: flex; justify-content: center; align-items: center; }
+        .dock { width: 524px; height: 96px; background: #fff; border: var(--border); display: flex; align-items: center; padding: 0 5px; gap: 4px; }
+        .dock .card { position: static; box-shadow: none; border-width: 1px; width: 68px; height: 84px; }
+
+        .overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; padding: 30px; text-align: center; }
+        .overlay h1 { font-size: 2.5rem; border-bottom: 5px solid #000; margin-bottom: 15px; }
+        .instruction-box { text-align: left; background: #f9f9f9; padding: 15px; border: 1px dashed #000; font-size: 1rem; margin-bottom: 15px; line-height: 1.6; width: 90%; box-sizing: border-box;}
+        
+        .level-btn { 
+            width: 90%; padding: 15px 20px; margin: 8px 0; background: #fff; border: 3px solid #000; 
+            font-family: inherit; font-size: 1.2rem; font-weight: bold; cursor: pointer; 
+            transition: 0.2s; position: relative; text-align: left;
+        }
+        .level-btn:not(.locked):hover { background: #000; color: #fff; }
+        .level-btn.locked { border-color: #ccc; color: #ccc; cursor: not-allowed; }
+        .level-btn.locked::after { content: '🔒 需通关前置'; position: absolute; right: 20px; font-size: 0.9rem; top: 50%; transform: translateY(-50%); }
+        
+        .hidden { display: none !important; }
+        .eliminate-anim { animation: shrink 0.2s forwards; }
+        @keyframes shrink { to { transform: scale(0); opacity: 0; } }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="startScreen" class="overlay">
+        <h1>超级羊 · C++</h1>
+        <div class="instruction-box">
+            <strong>【特训说明】</strong><br>
+            1. 选取 3 个相同代码块进入卡槽即可消除。<br>
+            2. 卡槽容量为 7，满员则特训失败。<br>
+            3. <b>每次启动需逐级解锁关卡，稳扎稳打。</b>
+        </div>
+        
+        <button id="btnLvl1" class="level-btn" onclick="initGame(1)">
+            1. 新手启蒙 (抗焦虑版)
+            <div style="font-size:0.8rem; font-weight:normal; margin-top:5px;">9张牌 | 纯平铺无遮挡 | 难度：极简</div>
+        </button>
+        
+        <button id="btnLvl2" class="level-btn locked" onclick="handleLvlClick(2)">
+            2. 每日热身 (经典金字塔)
+            <div style="font-size:0.8rem; font-weight:normal; margin-top:5px;">90张牌 | 五层经典叠放 | 难度：适中</div>
+        </button>
+
+        <button id="btnLvl3" class="level-btn locked" onclick="handleLvlClick(3)">
+            3. 炼狱挑战 (极度深渊)
+            <div style="font-size:0.8rem; font-weight:normal; margin-top:5px;">180张牌 | 变态深井盲盒 | 难度：极高</div>
+        </button>
+    </div>
+
+    <div class="hud">
+        <div id="hudTitle">准备就绪</div>
+        <div>卡槽: <span id="dockCount">0</span>/7</div>
+    </div>
+    <div class="tools">
+        <button id="undoBtn" class="tool-btn" onclick="useUndo()">撤回</button>
+        <button id="shuffleBtn" class="tool-btn" onclick="useShuffle()">洗牌</button>
+    </div>
+
+    <div id="playArea" class="play-area"></div>
+
+    <div class="dock-container">
+        <div id="dock" class="dock"></div>
+    </div>
+
+    <div id="resultOverlay" class="overlay hidden">
+        <h2 id="resTitle">DONE.</h2>
+        <p id="resDesc">STATISTICS...</p>
+        <button class="level-btn" style="text-align: center;" onclick="location.reload()">返回主菜单</button>
+    </div>
+</div>
+
+<script>
+    const UNIFIED_POOL = [
+        "int", "char", "bool", "float", "double", "void", "cin", "cout", "endl", 
+        "if", "else", "for", "while", "main", "return", "include", "using", 
+        "std", "const", "break", "continue", "long long", "sqrt", "max", "min", "abs",
+        "vector", "string", "stack", "queue", "map", "set", "pair", "bitset", 
+        "deque", "list", "sort", "swap", "size", "empty", "clear", "push", "pop", 
+        "top", "front", "back", "insert", "erase", "begin", "end", "define", 
+        "struct", "class", "public", "private", "new", "delete", "reverse", "unique", "namespace"
+    ];
+
+    const CARD_W = 72;
+    const CARD_H = 84;
+
+    let state = {
+        active: false, level: 1, highestUnlocked: 1,
+        allCards: [], dockCards: [], lastMove: null,
+        undoUsed: false, shuffleUsed: false
+    };
+
+    // ================= 核心：智能折行处理 =================
+    function formatCardText(str) {
+        // 1. 处理带空格的组合词
+        if (str.includes(' ')) return str.replace(' ', '␣<br>');
+        // 2. 处理带下划线的组合词
+        if (str.includes('_')) return str.replace('_', '_<br>');
+        // 3. 处理单长词：超过 7 个字符，从正中间劈开折行
+        if (str.length > 7) {
+            const mid = Math.ceil(str.length / 2);
+            return str.substring(0, mid) + '<br>' + str.substring(mid);
+        }
+        return str;
+    }
+
+    function unlockLevel(lvl) {
+        if (lvl > state.highestUnlocked) state.highestUnlocked = lvl;
+        if(state.highestUnlocked >= 2) document.getElementById('btnLvl2').classList.remove('locked');
+        if(state.highestUnlocked >= 3) document.getElementById('btnLvl3').classList.remove('locked');
+    }
+
+    function handleLvlClick(targetLvl) {
+        if(state.highestUnlocked >= targetLvl) initGame(targetLvl);
+        else alert("请先通过前面的关卡！");
+    }
+
+    let audioCtx;
+    function play(f, d, t='sine') {
+        if(!audioCtx) audioCtx = new AudioContext();
+        if(audioCtx.state==='suspended') audioCtx.resume();
+        let o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = t; o.frequency.value = f;
+        g.gain.setValueAtTime(0.05, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + d);
+        o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
+    }
+
+    function initGame(lvl) {
+        state.active = true; state.level = lvl;
+        state.allCards = []; state.dockCards = []; state.lastMove = null;
+        state.undoUsed = false; state.shuffleUsed = false;
+        
+        document.getElementById('startScreen').classList.add('hidden');
+        document.getElementById('resultOverlay').classList.add('hidden');
+        document.getElementById('playArea').innerHTML = '';
+        document.getElementById('dock').innerHTML = '';
+        document.getElementById('undoBtn').disabled = false;
+        document.getElementById('shuffleBtn').disabled = false;
+        
+        let titles = ["", "模式：新手启蒙", "模式：每日热身", "模式：炼狱挑战"];
+        document.getElementById('hudTitle').innerText = titles[lvl];
+
+        if(lvl === 1) generateLevel(3, 3);        
+        else if(lvl === 2) generateLevel(15, 6);  
+        else generateLevel(15, 12);               
+
+        updateStatus();
+    }
+
+    function generateLevel(wordCount, perWord) {
+        const selectedWords = [...UNIFIED_POOL].sort(() => 0.5 - Math.random()).slice(0, wordCount);
+        let deck = [];
+        for(let i=0; i<perWord; i++) selectedWords.forEach(w => deck.push(w));
+        deck.sort(() => Math.random() - 0.5);
+
+        let idx = 0;
+        if(state.level === 1) {
+            const layers = [{r:3, c:3, ox:172, oy:240}];
+            layers.forEach((l, z) => {
+                for(let r=0; r<l.r; r++) {
+                    for(let c=0; c<l.c; c++) {
+                        if(idx >= deck.length) return;
+                        createCard(deck[idx++], l.ox + c*CARD_W, l.oy + r*CARD_H, z);
+                    }
+                }
+            });
+        } else if(state.level === 2) {
+            // 【已修复】Y轴整体上移 40px，使其完美居中，远离底部卡槽
+            const layers = [
+                {r:6, c:6, ox:64, oy:60}, 
+                {r:5, c:5, ox:100, oy:102}, 
+                {r:4, c:4, ox:136, oy:144},
+                {r:3, c:3, ox:172, oy:186},
+                {r:2, c:2, ox:208, oy:228}
+            ];
+            layers.forEach((l, z) => {
+                for(let r=0; r<l.r; r++) {
+                    for(let c=0; c<l.c; c++) {
+                        if(idx >= deck.length) return;
+                        createCard(deck[idx++], l.ox + c*CARD_W, l.oy + r*CARD_H, z);
+                    }
+                }
+            });
+        } else {
+            const addBlock = (r, c, d, ox, oy) => {
+                for(let z=0; z<d; z++) {
+                    for(let i=0; i<r; i++) {
+                        for(let j=0; j<c; j++) {
+                            if(idx >= deck.length) return;
+                            createCard(deck[idx++], ox + j*CARD_W, oy + i*CARD_H - z*3, z);
+                        }
+                    }
+                }
+            };
+            addBlock(4, 4, 8, 136, 180); 
+            addBlock(1, 1, 12, 35, 280); 
+            addBlock(1, 1, 12, 453, 280); 
+            addBlock(1, 7, 2, 28, 50); // 上边缘微调
+            addBlock(1, 7, 2, 28, 540); // 下边缘微调
+        }
+    }
+
+    function createCard(text, x, y, z) {
+        const el = document.createElement('div');
+        el.className = 'card';
+        // 使用智能折行函数填充 HTML
+        el.innerHTML = formatCardText(text);
+        
+        el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.zIndex = z;
+        // 注意：obj.text 依然保存原本的一行字符串，用于后续的消除判断
+        const obj = { text, el, x, y, z, isRemoved: false, id: Math.random() };
+        
+        el.onclick = () => {
+            if(el.classList.contains('covered') || obj.isRemoved || state.dockCards.length >= 7) return;
+            play(600, 0.05, 'square');
+            state.lastMove = {...obj};
+            obj.isRemoved = true; el.style.display = 'none';
+            state.dockCards.push({text: obj.text, id: obj.id});
+            state.dockCards.sort((a,b) => a.text.localeCompare(b.text));
+            renderDock(); updateStatus(); checkMatch();
+        };
+        document.getElementById('playArea').appendChild(el);
+        state.allCards.push(obj);
+    }
+
+    function updateStatus() {
+        state.allCards.forEach(a => {
+            if(a.isRemoved) return;
+            let isCovered = state.allCards.some(b => 
+                !b.isRemoved && b.z > a.z && 
+                Math.abs(a.x - b.x) < CARD_W && Math.abs(a.y - b.y) < CARD_H
+            );
+            a.el.classList.toggle('covered', isCovered);
+        });
+        document.getElementById('dockCount').innerText = state.dockCards.length;
+    }
+
+    function renderDock() {
+        const d = document.getElementById('dock'); d.innerHTML = '';
+        state.dockCards.forEach(c => {
+            const el = document.createElement('div');
+            el.className = 'card'; 
+            // 卡槽里也应用智能折行
+            el.innerHTML = formatCardText(c.text);
+            d.appendChild(el);
+        });
+    }
+
+    function checkMatch() {
+        for(let i=0; i<=state.dockCards.length-3; i++) {
+            if(state.dockCards[i].text === state.dockCards[i+1].text && state.dockCards[i].text === state.dockCards[i+2].text) {
+                play(1000, 0.2);
+                const nodes = document.getElementById('dock').children;
+                [i, i+1, i+2].forEach(idx => nodes[idx].classList.add('eliminate-anim'));
+                setTimeout(() => {
+                    state.dockCards.splice(i, 3);
+                    state.lastMove = null;
+                    renderDock(); updateStatus(); checkWinLoss();
+                }, 200);
+                return;
+            }
+        }
+        checkWinLoss();
+    }
+
+    function useUndo() {
+        if(state.undoUsed || !state.lastMove) return;
+        state.undoUsed = true; document.getElementById('undoBtn').disabled = true;
+        const idx = state.dockCards.findIndex(c => c.id === state.lastMove.id);
+        if(idx !== -1) {
+            state.dockCards.splice(idx, 1);
+            const card = state.allCards.find(c => c.id === state.lastMove.id);
+            card.isRemoved = false; card.el.style.display = 'flex';
+            state.lastMove = null; renderDock(); updateStatus();
+        }
+    }
+
+    function useShuffle() {
+        if(state.shuffleUsed) return;
+        state.shuffleUsed = true; document.getElementById('shuffleBtn').disabled = true;
+        let active = state.allCards.filter(c => !c.isRemoved && !c.el.classList.contains('covered'));
+        let pos = active.map(c => ({x: c.x, y: c.y, z: c.z}));
+        pos.sort(() => Math.random() - 0.5);
+        active.forEach((c, i) => {
+            c.x = pos[i].x; c.y = pos[i].y; c.z = pos[i].z;
+            c.el.style.left = c.x+'px'; c.el.style.top = c.y+'px'; c.el.style.zIndex = c.z;
+        });
+        updateStatus();
+    }
+
+    function checkWinLoss() {
+        const remain = state.allCards.filter(c => !c.isRemoved).length;
+        if(remain === 0 && state.dockCards.length === 0) {
+            if(state.level === 1) {
+                unlockLevel(2); 
+                showRes("热身完毕", "太简单了？金字塔阵型已解锁，快去试试！");
+            } else if(state.level === 2) {
+                unlockLevel(3);
+                showRes("实力不凡", "恭喜！真正的深渊炼狱现已解锁，准备好颤抖了吗？");
+            } else {
+                showRes("代码之神", "不可思议！你竟然通过了极度深渊测试！");
+            }
+        } else if(state.dockCards.length >= 7) {
+            showRes("特训失败", "卡槽已满，堆栈溢出。请重新开始。");
+        }
+    }
+
+    function showRes(t, d) {
+        state.active = false;
+        document.getElementById('resTitle').innerText = t;
+        document.getElementById('resDesc').innerText = d;
+        
+        const resOverlay = document.getElementById('resultOverlay');
+        resOverlay.classList.remove('hidden');
+        
+        const oldNextBtn = document.getElementById('nextLvlBtn');
+        if(oldNextBtn) oldNextBtn.remove();
+        
+        if (t !== "特训失败" && state.level < 3) {
+            const nextBtn = document.createElement('button');
+            nextBtn.id = 'nextLvlBtn';
+            nextBtn.className = 'level-btn';
+            nextBtn.style.textAlign = 'center';
+            nextBtn.innerText = '直接进入下一关';
+            nextBtn.onclick = () => initGame(state.level + 1);
+            resOverlay.appendChild(nextBtn);
+        }
+    }
+</script>
+</body>
+</html>
