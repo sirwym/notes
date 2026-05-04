@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>超级打字 - SUPER TYPING [VER 3.1]</title>
+    <title>超级打字 - SUPER TYPING [VER 3.3 智能提示版]</title>
     <style>
         /* ================= 极客线框风格：IDE 极简美学 ================= */
         :root {
@@ -116,16 +116,37 @@
             font-size: 1.5rem; font-weight: bold; color: var(--fg);
             font-family: 'Consolas', monospace; white-space: nowrap; z-index: 6;
         }
-        .target.locked { background: var(--fg); color: var(--bg); transform: scale(1.1); z-index: 7; }
+        
+        /* 智能提示角标特效 */
+        .target[data-hint]::after {
+            content: attr(data-hint);
+            position: absolute;
+            top: 2px;
+            right: 3px;
+            font-size: 0.55rem;
+            color: #aaaaaa;
+            font-weight: normal;
+            font-family: 'Microsoft YaHei', sans-serif;
+            pointer-events: none;
+        }
+        
+        /* 增强型锁定样式：置顶并加入阴影，防止单词重叠看不清 */
+        .target.locked { 
+            background: var(--fg) !important; color: var(--bg) !important; 
+            transform: scale(1.15); z-index: 999; 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+        }
+        .target.locked .space-char { color: #666; }
+        .target.locked[data-hint]::after { color: #666666; } /* 锁定时角标变暗适应黑底 */
         
         .space-char { color: var(--gray); font-weight: normal; margin: 0 2px; }
         .char-typed { opacity: 0.2; text-decoration: line-through; }
         
         .error-shake { animation: errShake 0.2s; border-color: var(--error) !important; color: var(--error) !important; background: var(--bg) !important; }
         @keyframes errShake { 
-            0%, 100% { transform: scale(1.1) translateX(0); } 
-            25% { transform: scale(1.1) translateX(-4px); } 
-            75% { transform: scale(1.1) translateX(4px); } 
+            0%, 100% { transform: scale(1.15) translateX(0); } 
+            25% { transform: scale(1.15) translateX(-4px); } 
+            75% { transform: scale(1.15) translateX(4px); } 
         }
 
         /* ================= 结算面板 ================= */
@@ -231,47 +252,29 @@
             numbers: "0123456789".split(""),
             symbols_basic: ["#", "^", "{", "}", "(", ")", "[", "]", "<", ">", ";", "=", "+", "-", "*", "/", "%"],
             symbols_adv: ["<<", ">>", "==", "!=", "<=", ">=", "&&", "||", "&", "|", "!"],
-            // 1. 简单语法阶段 (主攻基础框架、数据类型、控制流)
-			cpp_simple: [
-				"include", "using", "namespace", "std", "main", "return", 
-				"int", "float", "double", "char", "bool", "void",
-				"cin", "cout", "endl", "long long", "const",
-				"if", "else", "else if", "switch", "case", "default", 
-				"for", "while", "do while", "break", "continue", "sqrt",
-				"max", "min", "abs", "bits", "stdc++.h", "scanf", "printf",
-				"pow", "ceil", "floor","fabs"
-			],
-
-			// 2. 困难语法阶段 (主攻长词、STL容器与算法、高级类型、数学库)
-			cpp_hard: [
-				// 宏定义与进阶 I/O
-				"define", "freopen", "getline",
-				
-				// 进阶类型与修饰符 (较长单词)
-				"signed", "unsigned", "auto", "nullptr_t",
-				
-				// 面向对象与内存管理
-				"struct", "union", "class", "public", "new", "delete", "protected", "private",
-				"operator",
-				
-				// STL 容器
-				"vector", "array", "deque", "list", "set", "map", "multimap", "multiset",
-				"unordered_map", "unordered_set", "stack", "queue", "priority_queue", 
-				"bitset", "string", "pair","forward_list","unordered_multimap","unordered_multiset",
-				
-				// STL 常用方法与迭代器
-				"begin", "end", "size", "empty", "clear", "insert", "erase", 
-				"front", "back", "pop", "push", "top", "length", "substr",
-				
-				// STL 算法 
-				"swap", "fill", "count", "find", "reverse", "unique", "sort", 
-				"stable_sort", "binary_search", "lower_bound", "upper_bound", 
-				"memset", "tolower",
-				
-				
-				// 随机数与扩展数学库
-				"rand", "srand","round", "log", "exp", "sin", "cos", "tan", "__gcd", "__lcm"
-			]
+            cpp_simple: [
+                "include", "using", "namespace", "std", "main", "return", 
+                "int", "float", "double", "char", "bool", "void",
+                "cin", "cout", "endl", "long long", "const",
+                "if", "else", "else if", "switch", "case", "default", 
+                "for", "while", "do while", "break", "continue", "sqrt",
+                "max", "min", "abs", "bits", "stdc++.h", "scanf", "printf",
+                "pow", "ceil", "floor","fabs"
+            ],
+            cpp_hard: [
+                "define", "freopen", "getline",
+                "signed", "unsigned", "auto", "nullptr_t",
+                "struct", "union", "class", "public", "new", "delete", "protected", "private", "operator",
+                "vector", "array", "deque", "list", "set", "map", "multimap", "multiset",
+                "unordered_map", "unordered_set", "stack", "queue", "priority_queue", 
+                "bitset", "string", "pair","forward_list","unordered_multimap","unordered_multiset",
+                "begin", "end", "size", "empty", "clear", "insert", "erase", 
+                "front", "back", "pop", "push", "top", "length", "substr",
+                "swap", "fill", "count", "find", "reverse", "unique", "sort", 
+                "stable_sort", "binary_search", "lower_bound", "upper_bound", 
+                "memset", "tolower",
+                "rand", "srand","round", "log", "exp", "sin", "cos", "tan", "__gcd", "__lcm"
+            ]
         };
         DIC.symbols = DIC.symbols_basic.concat(DIC.symbols_adv);
         DIC.cpp_all = DIC.cpp_simple.concat(DIC.cpp_hard);
@@ -284,7 +287,7 @@
             { name: "第5关：终极试炼", target: 35, time: 60, speed: 1.2, interval: 1200, pool: ['cpp_all', 'symbols'] }
         ];
 
-        const STORAGE_KEY = 'superTyping_records_v3.1';
+        const STORAGE_KEY = 'superTyping_records_v3.3';
         function getRecords() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch (e) { return {}; } }
         function saveAndCheckRecord(modeKey, wpm, acc, score) {
             let records = getRecords();
@@ -332,7 +335,6 @@
             document.getElementById('resultOverlay').classList.add('hidden');
             document.getElementById('playArea').innerHTML = '';
             
-            // UI 控制
             document.getElementById('boxLevel').classList.toggle('hidden', m !== 'breakthrough');
             document.getElementById('btnEndPrac').classList.toggle('hidden', m !== 'cpp_prac');
             document.getElementById('boxWPM').classList.toggle('hidden', m !== 'cpp_prac');
@@ -341,13 +343,13 @@
             document.getElementById('boxTime').classList.toggle('hidden', m !== 'breakthrough');
 
             if(m === 'breakthrough') {
-                S.levelIdx = 0; // 默认从第一关开始，除非逻辑调整
+                S.levelIdx = (sub !== '') ? parseInt(sub) : 0; 
                 document.getElementById('labelMain').innerText = '进度:';
                 initLevel(S.levelIdx); 
             } else if (m === 'cpp_prac') {
                 document.getElementById('labelMain').innerText = '按键:';
                 S.speed=1.0; S.interval=1500; 
-            } else { // cpp挑战 / endless
+            } else { 
                 document.getElementById('labelMain').innerText = '得分:';
                 S.speed=1.0; S.interval=1500;
             }
@@ -379,6 +381,20 @@
         function spawn() {
             let content = getRand();
             const el = document.createElement('div'); el.className = 'target';
+            
+            // ======= 智能生成角标提示 =======
+            let hint = '';
+            if (content.type === 'char') {
+                if (/[A-Z]/.test(content.text)) hint = '大';
+                else if (/[a-z]/.test(content.text)) hint = '小';
+                else if (/[0-9]/.test(content.text)) hint = '数';
+                else hint = '符'; 
+            } else {
+                hint = '词'; 
+            }
+            if (hint) el.setAttribute('data-hint', hint);
+            // ================================
+
             if(content.type === 'word') {
                 for(let c of content.text) { 
                     let s = document.createElement('span'); 
@@ -394,28 +410,36 @@
         }
 
         function getRand() {
-            let pool = [];
-            // 挑战模式和练习模式公用同一套分级词库逻辑
-            if(S.mode === 'cpp' || S.mode === 'cpp_prac') {
-                if(S.subMode === 'simple') pool = DIC.cpp_simple.concat(DIC.symbols_basic);
-                else if(S.subMode === 'hard') pool = DIC.cpp_hard.concat(DIC.symbols_adv);
-                else pool = DIC.cpp_all.concat(DIC.symbols);
-            } else if(S.mode === 'breakthrough') {
-                LEVELS[S.levelIdx].pool.forEach(p=>pool=pool.concat(DIC[p]));
-            } else { // endless
-                let r = Math.random(); 
-                if(r < 0.15) return {type:'word', text:DIC.cpp_all[Math.floor(Math.random()*DIC.cpp_all.length)]};
-                pool = DIC.letters.concat(DIC.symbols_basic);
-            }
-            let res = pool[Math.floor(Math.random()*pool.length)];
-            return res.length > 1 ? {type:'word', text:res} : {type:'char', text:res};
-        }
+			let pool = [];
+			if(S.mode === 'cpp' || S.mode === 'cpp_prac') {
+				// 简单和困难模式现在都直接合并 DIC.symbols (它包含了基础和复合符号)
+				if(S.subMode === 'simple') pool = DIC.cpp_simple.concat(DIC.symbols);
+				else if(S.subMode === 'hard') pool = DIC.cpp_hard.concat(DIC.symbols);
+				else pool = DIC.cpp_all.concat(DIC.symbols);
+			} else if(S.mode === 'breakthrough') {
+				LEVELS[S.levelIdx].pool.forEach(p=>pool=pool.concat(DIC[p]));
+			} else {
+				let r = Math.random(); 
+				if(r < 0.15) return {type:'word', text:DIC.cpp_all[Math.floor(Math.random()*DIC.cpp_all.length)]};
+				pool = DIC.letters.concat(DIC.numbers).concat(DIC.symbols);
+			}
+			let res = pool[Math.floor(Math.random()*pool.length)];
+			return res.length > 1 ? {type:'word', text:res} : {type:'char', text:res};
+		}
 
         window.addEventListener('keydown', e => {
-            if(!S.active || ['Shift','Control','Alt','Meta','CapsLock','Process','Tab'].includes(e.key)) return;
+            // 过滤功能键，防止 Backspace/Enter 等引发扣分
+            if(!S.active || ['Process'].includes(e.key) || e.key.length > 1) {
+                if(e.key === 'Escape' && S.mode === 'cpp_prac') checkFinish();
+                return;
+            }
+            
+            // 防止空格键滚动网页
+            if(e.key === ' ') e.preventDefault();
+            
             initAudioEngine();
-            if(e.key === 'Escape' && S.mode === 'cpp_prac') { checkFinish(); return; }
             S.totalKeys++;
+
             if(S.locked) {
                 if(e.key === S.locked.text[S.locked.idx]) {
                     S.correctKeys++; beep(800, 0.05); 
@@ -426,10 +450,12 @@
                 } else { handleLockedError(); }
                 return;
             }
+
             let found = -1, maxY = -100;
             for(let i=0; i<S.targets.length; i++) {
                 if(S.targets[i].text[0] === e.key && S.targets[i].y > maxY) { maxY = S.targets[i].y; found = i; }
             }
+
             if(found !== -1) {
                 S.correctKeys++; const t = S.targets[found];
                 if(t.type === 'char') { beep(800, 0.05); finalize(found); }
@@ -446,7 +472,12 @@
             if(S.mode==='breakthrough') { S.hitCount++; if(S.hitCount >= LEVELS[S.levelIdx].target) checkFinish(); } 
             else {
                 let b = t.type==='word' ? t.text.length*15 : 10; S.score += Math.floor(b*(1+S.combo*0.05));
-                if(S.mode==='endless') { S.speed = Math.min(1.8, 1.0 + S.score / 20000); S.interval = Math.max(1100, 1500 - S.score * 0.02); }
+				if(S.mode==='endless') { 
+					// 极限速度上调至 2.5 (分数达到约 22500 时达到极速)
+					S.speed = Math.min(2.5, 1.0 + S.score / 15000); 
+					// 生成间隔下探至 800 毫秒 (分数达到 35000 时达到极速)
+					S.interval = Math.max(800, 1500 - S.score * 0.02); 
+				}
                 if(S.mode==='cpp') { S.speed = Math.min(1.2, 1.0 + S.score / 15000); S.interval = Math.max(1300, 1500 - S.score * 0.01); }
             }
             updateHUD();
@@ -456,7 +487,15 @@
 
         function handleCrash(i) {
             const t = S.targets[i]; if(t.el.parentNode) t.el.parentNode.removeChild(t.el);
-            S.targets.splice(i, 1); if(S.locked === t) S.locked = null; S.combo = 0; 
+            S.targets.splice(i, 1); 
+            
+            // 坠落元素为锁定的词时，给出明显提示
+            if(S.locked === t) {
+                S.locked = null;
+                beep(150, 0.2, 'sawtooth'); 
+            }
+            
+            S.combo = 0; 
             if(S.mode==='cpp' || S.mode==='endless') {
                 S.hp--; beep(50, 0.3, 'sawtooth');
                 const o = document.getElementById('hurtOverlay'); o.style.opacity = 0.5; setTimeout(()=>o.style.opacity=0, 100);

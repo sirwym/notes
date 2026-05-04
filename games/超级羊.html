@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>超级羊 · C++ 关键字特训 [VER 3.1]</title>
+    <title>超级羊 · C++ 关键字特训 [VER 3.3]</title>
     <style>
         :root {
             --bg: #ffffff;
@@ -39,7 +39,7 @@
             background-size: 20px 20px; overflow: hidden; 
         }
 
-        /* 统一大字号卡片，彻底废弃缩小字体的CSS */
+        /* 统一大字号卡片 */
         .card {
             position: absolute; width: 72px; height: 84px; 
             background: var(--bg); border: var(--border); border-radius: 6px; 
@@ -106,8 +106,8 @@
         <div>卡槽: <span id="dockCount">0</span>/7</div>
     </div>
     <div class="tools">
-        <button id="undoBtn" class="tool-btn" onclick="useUndo()">撤回</button>
-        <button id="shuffleBtn" class="tool-btn" onclick="useShuffle()">洗牌</button>
+        <button id="undoBtn" class="tool-btn" onclick="useUndo()">撤回 (3)</button>
+        <button id="shuffleBtn" class="tool-btn" onclick="useShuffle()">洗牌 (3)</button>
     </div>
 
     <div id="playArea" class="play-area"></div>
@@ -137,19 +137,17 @@
     const CARD_W = 72;
     const CARD_H = 84;
 
+    // 修复 Bug：增加 isAnimating 动画锁，升级撤回逻辑为 moveHistory 历史栈
     let state = {
-        active: false, level: 1, highestUnlocked: 1,
-        allCards: [], dockCards: [], lastMove: null,
-        undoUsed: false, shuffleUsed: false
+        active: false, level: 1, highestUnlocked: 3,
+        allCards: [], dockCards: [], moveHistory: [],
+        isAnimating: false,
+        undoCount: 3, shuffleCount: 3
     };
 
-    // ================= 核心：智能折行处理 =================
     function formatCardText(str) {
-        // 1. 处理带空格的组合词
         if (str.includes(' ')) return str.replace(' ', '␣<br>');
-        // 2. 处理带下划线的组合词
         if (str.includes('_')) return str.replace('_', '_<br>');
-        // 3. 处理单长词：超过 7 个字符，从正中间劈开折行
         if (str.length > 7) {
             const mid = Math.ceil(str.length / 2);
             return str.substring(0, mid) + '<br>' + str.substring(mid);
@@ -180,15 +178,20 @@
 
     function initGame(lvl) {
         state.active = true; state.level = lvl;
-        state.allCards = []; state.dockCards = []; state.lastMove = null;
-        state.undoUsed = false; state.shuffleUsed = false;
+        state.allCards = []; state.dockCards = []; state.moveHistory = [];
+        state.isAnimating = false;
+        state.undoCount = 3; state.shuffleCount = 3;
         
         document.getElementById('startScreen').classList.add('hidden');
         document.getElementById('resultOverlay').classList.add('hidden');
         document.getElementById('playArea').innerHTML = '';
         document.getElementById('dock').innerHTML = '';
-        document.getElementById('undoBtn').disabled = false;
-        document.getElementById('shuffleBtn').disabled = false;
+        
+        const uBtn = document.getElementById('undoBtn');
+        const sBtn = document.getElementById('shuffleBtn');
+        uBtn.disabled = false; sBtn.disabled = false;
+        uBtn.innerText = `撤回 (${state.undoCount})`;
+        sBtn.innerText = `洗牌 (${state.shuffleCount})`;
         
         let titles = ["", "模式：新手启蒙", "模式：每日热身", "模式：炼狱挑战"];
         document.getElementById('hudTitle').innerText = titles[lvl];
@@ -218,7 +221,6 @@
                 }
             });
         } else if(state.level === 2) {
-            // 【已修复】Y轴整体上移 40px，使其完美居中，远离底部卡槽
             const layers = [
                 {r:6, c:6, ox:64, oy:60}, 
                 {r:5, c:5, ox:100, oy:102}, 
@@ -248,28 +250,32 @@
             addBlock(4, 4, 8, 136, 180); 
             addBlock(1, 1, 12, 35, 280); 
             addBlock(1, 1, 12, 453, 280); 
-            addBlock(1, 7, 2, 28, 50); // 上边缘微调
-            addBlock(1, 7, 2, 28, 540); // 下边缘微调
+            addBlock(1, 7, 2, 28, 50); 
+            addBlock(1, 7, 2, 28, 540); 
         }
     }
 
     function createCard(text, x, y, z) {
         const el = document.createElement('div');
         el.className = 'card';
-        // 使用智能折行函数填充 HTML
         el.innerHTML = formatCardText(text);
         
         el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.zIndex = z;
-        // 注意：obj.text 依然保存原本的一行字符串，用于后续的消除判断
         const obj = { text, el, x, y, z, isRemoved: false, id: Math.random() };
         
         el.onclick = () => {
-            if(el.classList.contains('covered') || obj.isRemoved || state.dockCards.length >= 7) return;
+            // 修复 Bug：增加 isAnimating 判定，防止消除动画期间乱点引发灾难
+            if(state.isAnimating || el.classList.contains('covered') || obj.isRemoved || state.dockCards.length >= 7) return;
+            
             play(600, 0.05, 'square');
-            state.lastMove = {...obj};
+            
+            // 压入历史栈以供多次撤回
+            state.moveHistory.push({...obj});
+            
             obj.isRemoved = true; el.style.display = 'none';
             state.dockCards.push({text: obj.text, id: obj.id});
             state.dockCards.sort((a,b) => a.text.localeCompare(b.text));
+            
             renderDock(); updateStatus(); checkMatch();
         };
         document.getElementById('playArea').appendChild(el);
@@ -277,11 +283,18 @@
     }
 
     function updateStatus() {
+        // 定义容差值 (Hitbox Shrinking)
+        // 数值越大，判定越宽松 (容许的重叠面积越大)
+        const marginX = 15; 
+        const marginY = 15;
+
         state.allCards.forEach(a => {
             if(a.isRemoved) return;
             let isCovered = state.allCards.some(b => 
                 !b.isRemoved && b.z > a.z && 
-                Math.abs(a.x - b.x) < CARD_W && Math.abs(a.y - b.y) < CARD_H
+                // 核心修改：在宽高判断中减去容差值
+                Math.abs(a.x - b.x) < (CARD_W - marginX) && 
+                Math.abs(a.y - b.y) < (CARD_H - marginY)
             );
             a.el.classList.toggle('covered', isCovered);
         });
@@ -293,21 +306,25 @@
         state.dockCards.forEach(c => {
             const el = document.createElement('div');
             el.className = 'card'; 
-            // 卡槽里也应用智能折行
             el.innerHTML = formatCardText(c.text);
             d.appendChild(el);
         });
     }
 
+    // 重构安全的 checkMatch 逻辑
     function checkMatch() {
         for(let i=0; i<=state.dockCards.length-3; i++) {
             if(state.dockCards[i].text === state.dockCards[i+1].text && state.dockCards[i].text === state.dockCards[i+2].text) {
                 play(1000, 0.2);
+                state.isAnimating = true; // 锁定面板
+                
                 const nodes = document.getElementById('dock').children;
                 [i, i+1, i+2].forEach(idx => nodes[idx].classList.add('eliminate-anim'));
+                
                 setTimeout(() => {
                     state.dockCards.splice(i, 3);
-                    state.lastMove = null;
+                    state.moveHistory = []; // 修复 Bug：一旦消除，之前的不可撤回
+                    state.isAnimating = false; // 解除锁定
                     renderDock(); updateStatus(); checkWinLoss();
                 }, 200);
                 return;
@@ -316,28 +333,51 @@
         checkWinLoss();
     }
 
+    // 重构连击撤回逻辑
     function useUndo() {
-        if(state.undoUsed || !state.lastMove) return;
-        state.undoUsed = true; document.getElementById('undoBtn').disabled = true;
-        const idx = state.dockCards.findIndex(c => c.id === state.lastMove.id);
+        if(state.isAnimating || state.undoCount <= 0 || state.moveHistory.length === 0) return;
+        
+        state.undoCount--;
+        const btn = document.getElementById('undoBtn');
+        btn.innerText = `撤回 (${state.undoCount})`;
+        if (state.undoCount === 0) btn.disabled = true;
+
+        play(400, 0.1);
+        
+        // 弹出最后一次点击操作
+        const lastAction = state.moveHistory.pop();
+        const idx = state.dockCards.findIndex(c => c.id === lastAction.id);
+        
         if(idx !== -1) {
             state.dockCards.splice(idx, 1);
-            const card = state.allCards.find(c => c.id === state.lastMove.id);
+            const card = state.allCards.find(c => c.id === lastAction.id);
             card.isRemoved = false; card.el.style.display = 'flex';
-            state.lastMove = null; renderDock(); updateStatus();
+            renderDock(); updateStatus();
         }
     }
 
+    // 修复真·洗牌逻辑
     function useShuffle() {
-        if(state.shuffleUsed) return;
-        state.shuffleUsed = true; document.getElementById('shuffleBtn').disabled = true;
-        let active = state.allCards.filter(c => !c.isRemoved && !c.el.classList.contains('covered'));
-        let pos = active.map(c => ({x: c.x, y: c.y, z: c.z}));
+        if(state.isAnimating || state.shuffleCount <= 0) return;
+        
+        state.shuffleCount--;
+        const btn = document.getElementById('shuffleBtn');
+        btn.innerText = `洗牌 (${state.shuffleCount})`;
+        if (state.shuffleCount === 0) btn.disabled = true;
+
+        play(500, 0.2, 'sawtooth');
+        
+        // 修复 Bug：洗乱桌面所有未被消除的牌（包括被盖住的）
+        let remainCards = state.allCards.filter(c => !c.isRemoved);
+        let pos = remainCards.map(c => ({x: c.x, y: c.y, z: c.z}));
         pos.sort(() => Math.random() - 0.5);
-        active.forEach((c, i) => {
+        
+        remainCards.forEach((c, i) => {
             c.x = pos[i].x; c.y = pos[i].y; c.z = pos[i].z;
             c.el.style.left = c.x+'px'; c.el.style.top = c.y+'px'; c.el.style.zIndex = c.z;
         });
+        
+        state.moveHistory = []; // 修复 Bug：洗牌后物理坐标变更，必须清空历史撤回栈
         updateStatus();
     }
 
