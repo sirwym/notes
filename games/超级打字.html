@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>超级打字 - SUPER TYPING [VER 2.4]</title>
+    <title>超级打字 - SUPER TYPING [VER 3.1]</title>
     <style>
         /* ================= 极客线框风格：IDE 极简美学 ================= */
         :root {
@@ -12,6 +12,7 @@
             --gray: #888888;
             --light-gray: #f0f0f0;
             --error: #cf222e;
+            --success: #0969da;
         }
 
         body {
@@ -33,12 +34,12 @@
 
         /* ================= 首页：极简线框磁贴 ================= */
         .home-screen {
-            padding: 40px 30px;
+            padding: 30px 25px;
             display: flex; flex-direction: column;
             height: 100%; box-sizing: border-box;
         }
         .home-screen h1 {
-            text-align: left; font-size: 2.5rem; margin: 0 0 40px 0;
+            text-align: left; font-size: 2.2rem; margin: 0 0 20px 0;
             letter-spacing: 2px; font-weight: 900;
             border-bottom: 4px solid var(--fg); display: inline-block;
         }
@@ -54,17 +55,30 @@
 
         .tile {
             background: var(--bg);
-            padding: 20px; display: flex; flex-direction: column;
+            padding: 12px 15px; display: flex; flex-direction: column;
             justify-content: flex-start; align-items: flex-start;
-            cursor: pointer; transition: background 0.1s;
             position: relative;
         }
-        .tile:hover { background: var(--fg); color: var(--bg); }
-        .tile:hover .tile-desc { color: var(--bg); }
-        .tile:hover::before { content: '>'; position: absolute; right: 20px; bottom: 20px; font-size: 1.5rem; font-weight: bold; }
+        
+        .tile-normal { cursor: pointer; transition: background 0.1s; }
+        .tile-normal:hover { background: var(--fg); color: var(--bg); }
+        .tile-normal:hover .tile-desc { color: var(--light-gray); }
+        .tile-normal:hover::before { content: '>'; position: absolute; right: 15px; bottom: 15px; font-size: 1.5rem; font-weight: bold; }
 
-        .tile-title { font-size: 1.2rem; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; }
-        .tile-desc { font-size: 0.85rem; color: var(--gray); line-height: 1.4; }
+        /* 组合卡片（练习/挑战） */
+        .prac-btns {
+            display: flex; flex-direction: column; width: 100%; gap: 5px; 
+            margin-top: 10px; position: relative; z-index: 10;
+        }
+        .btn-sub {
+            background: var(--bg); color: var(--fg); border: 1px solid var(--fg); 
+            padding: 5px 0; font-family: inherit; font-size: 0.8rem; font-weight: bold; 
+            cursor: pointer; transition: background 0.1s; width: 100%;
+        }
+        .btn-sub:hover { background: var(--fg); color: var(--bg); }
+
+        .tile-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 3px; text-transform: uppercase; }
+        .tile-desc { font-size: 0.75rem; color: var(--gray); line-height: 1.3; }
 
         /* ================= 游戏内 HUD ================= */
         .hud {
@@ -74,7 +88,7 @@
             background: var(--bg); font-size: 0.9rem;
         }
         .hud-left { display: flex; flex-direction: column; gap: 3px; }
-        .hud-right { text-align: right; }
+        .hud-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
         .stat-val { font-weight: bold; color: var(--fg); }
         .stat-label { color: var(--gray); margin-right: 5px; }
 
@@ -104,7 +118,6 @@
         }
         .target.locked { background: var(--fg); color: var(--bg); transform: scale(1.1); z-index: 7; }
         
-        /* 空格视觉化样式 */
         .space-char { color: var(--gray); font-weight: normal; margin: 0 2px; }
         .char-typed { opacity: 0.2; text-decoration: line-through; }
         
@@ -115,23 +128,30 @@
             75% { transform: scale(1.1) translateX(4px); } 
         }
 
+        /* ================= 结算面板 ================= */
         .overlay {
             position: absolute; inset: 0; background: var(--bg);
             display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 100; padding: 40px;
         }
-        .overlay h2 { font-size: 2.5rem; margin-bottom: 10px; border-bottom: 5px solid var(--fg); }
-        .overlay p { text-align: center; margin-bottom: 30px; font-weight: bold; }
+        .overlay h2 { font-size: 2.5rem; margin-bottom: 20px; border-bottom: 5px solid var(--fg); }
         
+        #resStats {
+            background: var(--light-gray); padding: 20px; border: 2px solid var(--fg); 
+            margin-bottom: 30px; text-align: left; font-size: 1.1rem; line-height: 1.8; width: 100%; box-sizing: border-box;
+        }
+
         .btn {
             padding: 15px 30px; background: var(--bg); border: 2px solid var(--fg);
-            font-family: inherit; font-weight: bold; cursor: pointer; margin: 10px;
+            font-family: inherit; font-weight: bold; cursor: pointer; margin: 10px; font-size: 1rem;
         }
         .btn:hover { background: var(--fg); color: var(--bg); }
 
-        .hurt-flash { position: absolute; inset: 0; background: var(--fg); pointer-events: none; opacity: 0; z-index: 200; }
+        .hurt-flash { position: absolute; inset: 0; background: var(--error); pointer-events: none; opacity: 0; z-index: 200; }
         .shake { animation: shake 0.2s infinite; }
         @keyframes shake { 0%,100% {transform:translateX(0)} 25% {transform:translateX(-5px)} 75% {transform:translateX(5px)} }
+        @keyframes flashInfo { 0%, 100% {opacity: 1;} 50% {opacity: 0.3;} }
+        
         .hidden { display: none !important; }
     </style>
 </head>
@@ -141,19 +161,32 @@
         <div id="homeScreen" class="home-screen">
             <h1>超级打字</h1>
             <div class="tile-grid">
-                <div class="tile" onclick="startMode('simple')">
-                    <div class="tile-title">简单模式</div>
-                    <div class="tile-desc">纯字母 + 数字<br>[限时积分]</div>
-                </div>
-                <div class="tile" onclick="startMode('breakthrough')">
+                <div class="tile tile-normal" onclick="startMode('breakthrough')">
                     <div class="tile-title">闯关模式</div>
-                    <div class="tile-desc">第1-5关卡递进<br>[阶段特训]</div>
+                    <div class="tile-desc">第1-5关卡递进<br>[阶段特训/限时]</div>
                 </div>
-                <div class="tile" onclick="startMode('cpp')">
+                
+                <div class="tile">
+                    <div class="tile-title">C++ 练习</div>
+                    <div class="tile-desc">无压力/测速记词</div>
+                    <div class="prac-btns">
+                        <button onclick="event.stopPropagation(); startMode('cpp_prac', 'simple')" class="btn-sub">简单练习</button>
+                        <button onclick="event.stopPropagation(); startMode('cpp_prac', 'hard')" class="btn-sub">困难练习</button>
+                        <button onclick="event.stopPropagation(); startMode('cpp_prac', 'all')" class="btn-sub">全阶段练习</button>
+                    </div>
+                </div>
+
+                <div class="tile">
                     <div class="tile-title">C++ 挑战</div>
-                    <div class="tile-desc">关键字 + 符号<br>[生存考验]</div>
+                    <div class="tile-desc">生存挑战/损毁警告</div>
+                    <div class="prac-btns">
+                        <button onclick="event.stopPropagation(); startMode('cpp', 'simple')" class="btn-sub">简单挑战</button>
+                        <button onclick="event.stopPropagation(); startMode('cpp', 'hard')" class="btn-sub">困难挑战</button>
+                        <button onclick="event.stopPropagation(); startMode('cpp', 'all')" class="btn-sub">全阶段挑战</button>
+                    </div>
                 </div>
-                <div class="tile" onclick="startMode('endless')">
+
+                <div class="tile tile-normal" onclick="startMode('endless')">
                     <div class="tile-title">无尽模式</div>
                     <div class="tile-desc">全字符综合测试<br>[极限竞技]</div>
                 </div>
@@ -168,7 +201,12 @@
             <div class="hud-right">
                 <div id="boxHp"><span class="stat-label">装甲:</span><span id="valHp" class="stat-val">♥♥♥♥♥</span></div>
                 <div id="boxTime" class="hidden"><span class="stat-label">时间:</span><span id="valTime" class="stat-val">60s</span></div>
-                <div style="font-size:0.7rem; margin-top:5px; color:#888;">间隔: <span id="valInterval">1500</span>ms / 速度: <span id="valSpeed">1.0</span>x</div>
+                
+                <div id="boxWPM" class="hidden"><span class="stat-label">速度:</span><span id="valWPM" class="stat-val">0</span> <span style="font-size:0.7rem">WPM</span></div>
+                <div id="boxAcc" class="hidden"><span class="stat-label">正确率:</span><span id="valAcc" class="stat-val">100%</span></div>
+                <button id="btnEndPrac" class="btn-sub hidden" style="width: auto; padding: 2px 10px; border-color: var(--error); color: var(--error); margin-top: 5px;" onclick="checkFinish()">结束结算 [ESC]</button>
+                
+                <div style="font-size:0.6rem; margin-top:5px; color:#aaa;">间隔: <span id="valInterval">1500</span>ms / 速度: <span id="valSpeed">1.0</span>x</div>
             </div>
         </div>
 
@@ -178,48 +216,96 @@
 
         <div id="resultOverlay" class="overlay hidden">
             <h2 id="resTitle">完成</h2>
-            <p id="resDesc">正在生成战报...</p>
-            <div>
-                <button id="resActionBtn" class="btn">重新挑战</button>
-                <button onclick="location.reload()" class="btn">返回主菜单</button>
+            <div id="resStats"></div>
+            <div style="display: flex; width: 100%; justify-content: center;">
+                <button id="resActionBtn" class="btn">再来一次</button>
+                <button onclick="location.reload()" class="btn">主菜单</button>
             </div>
         </div>
     </div>
 
     <script>
-        // =============== 配置与字典 ===============
+        // =============== 配置与分级词典 ===============
         const DIC = {
             letters: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""),
             numbers: "0123456789".split(""),
-            symbols: [".","~", "^", "#","{", "}", "(", ")", "[", "]", "<", ">", ";", "_", "=", "+", "-", "*", "/", "&", "|", "!"],
-            keywords: [
-                "include", "bits", "stdc++.h", "using", "namespace", "std", "main", "int", "float", "double", "long long", "char",
-				"return","define", "cin", "cout", "scanf", "printf", "endl", "bool", "void", "nullptr_t", "signed", "unsigned", "const",
-				"new", "delete", "if", "else", "else if", "switch", "case", "default", "for", "while", "do while", "break", "continue",
-				"struct", "union", "class", "public", "freopen", "vector", "array", "deque", "list", "set", "map", "multimap", "unordered_map",
-				"unordered_set", "stack", "queue", "priority_queue", "begin", "end", "size", "empty", "swap", "clear", "clear", "insert", "erase",
-				"front", "back", "fill", "count", "lower_bound", "upper_bound", "auto", "pop", "push", "top", "find", "reverse", "unique", "sort",
-				"stable_sort","binary_search", "lower_bound", "upper_bound", "bitset", "string", "pair", "max", "min", "abs", "fabs", "sqrt", "pow",
-				"ceil", "floor", "round", "log", "exp", "sin", "cos", "tan", "__gcd", "__lcm", "length", "substr", "memset",
-				"tolower", "getline", "rand", "srand", ""
-            ]
+            symbols_basic: ["#", "^", "{", "}", "(", ")", "[", "]", "<", ">", ";", "=", "+", "-", "*", "/", "%"],
+            symbols_adv: ["<<", ">>", "==", "!=", "<=", ">=", "&&", "||", "&", "|", "!"],
+            // 1. 简单语法阶段 (主攻基础框架、数据类型、控制流)
+			cpp_simple: [
+				"include", "using", "namespace", "std", "main", "return", 
+				"int", "float", "double", "char", "bool", "void",
+				"cin", "cout", "endl", "long long", "const",
+				"if", "else", "else if", "switch", "case", "default", 
+				"for", "while", "do while", "break", "continue", "sqrt",
+				"max", "min", "abs", "bits", "stdc++.h", "scanf", "printf",
+				"pow", "ceil", "floor","fabs"
+			],
+
+			// 2. 困难语法阶段 (主攻长词、STL容器与算法、高级类型、数学库)
+			cpp_hard: [
+				// 宏定义与进阶 I/O
+				"define", "freopen", "getline",
+				
+				// 进阶类型与修饰符 (较长单词)
+				"signed", "unsigned", "auto", "nullptr_t",
+				
+				// 面向对象与内存管理
+				"struct", "union", "class", "public", "new", "delete", "protected", "private",
+				"operator",
+				
+				// STL 容器
+				"vector", "array", "deque", "list", "set", "map", "multimap", "multiset",
+				"unordered_map", "unordered_set", "stack", "queue", "priority_queue", 
+				"bitset", "string", "pair","forward_list","unordered_multimap","unordered_multiset",
+				
+				// STL 常用方法与迭代器
+				"begin", "end", "size", "empty", "clear", "insert", "erase", 
+				"front", "back", "pop", "push", "top", "length", "substr",
+				
+				// STL 算法 
+				"swap", "fill", "count", "find", "reverse", "unique", "sort", 
+				"stable_sort", "binary_search", "lower_bound", "upper_bound", 
+				"memset", "tolower",
+				
+				
+				// 随机数与扩展数学库
+				"rand", "srand","round", "log", "exp", "sin", "cos", "tan", "__gcd", "__lcm"
+			]
         };
+        DIC.symbols = DIC.symbols_basic.concat(DIC.symbols_adv);
+        DIC.cpp_all = DIC.cpp_simple.concat(DIC.cpp_hard);
 
         const LEVELS = [
             { name: "第1关：基础字母", target: 20, time: 60, speed: 1.0, interval: 1500, pool: ['letters'] },
             { name: "第2关：数字协同", target: 25, time: 60, speed: 1.1, interval: 1400, pool: ['letters', 'numbers'] },
             { name: "第3关：符号突围", target: 25, time: 60, speed: 1.1, interval: 1300, pool: ['symbols'] },
-            { name: "第4关：代码语法", target: 20, time: 60, speed: 1.0, interval: 1500, pool: ['keywords'] },
-            { name: "第5关：终极试炼", target: 35, time: 60, speed: 1.2, interval: 1200, pool: ['letters', 'symbols', 'keywords'] }
+            { name: "第4关：基础语法", target: 25, time: 60, speed: 1.0, interval: 1500, pool: ['cpp_simple'] },
+            { name: "第5关：终极试炼", target: 35, time: 60, speed: 1.2, interval: 1200, pool: ['cpp_all', 'symbols'] }
         ];
 
-        // =============== 音效 (Web Audio) ===============
+        const STORAGE_KEY = 'superTyping_records_v3.1';
+        function getRecords() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch (e) { return {}; } }
+        function saveAndCheckRecord(modeKey, wpm, acc, score) {
+            let records = getRecords();
+            if (!records[modeKey]) records[modeKey] = { bestWPM: 0, bestAcc: 0, bestScore: 0 };
+            let isNewRecord = false; let hist = records[modeKey];
+            if (modeKey.includes('prac')) {
+                if (wpm > hist.bestWPM || (wpm === hist.bestWPM && acc > hist.bestAcc)) {
+                    hist.bestWPM = wpm; hist.bestAcc = acc; isNewRecord = true;
+                }
+            } else {
+                if (score > hist.bestScore) { hist.bestScore = score; isNewRecord = true; }
+            }
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+            return { isNewRecord, bestWPM: hist.bestWPM, bestAcc: hist.bestAcc, bestScore: hist.bestScore };
+        }
+
         let audioCtx;
         function initAudioEngine() {
             if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             if(audioCtx.state === 'suspended') audioCtx.resume();
         }
-
         function beep(freq, dur, type='square') {
             if(!audioCtx) return;
             const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
@@ -228,47 +314,44 @@
             o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + dur);
         }
 
-        // =============== 状态变量 ===============
         let S = {
-            active: false, mode: '', score: 0, hp: 5, combo: 0,
+            active: false, mode: '', subMode: '', score: 0, hp: 5, combo: 0,
             timer: 60, hitCount: 0, levelIdx: 0,
             speed: 1.0, interval: 1500,
-            targets: [], locked: null, lastSpawn: 0, lastTick: 0
+            targets: [], locked: null, lastSpawn: 0, lastTick: 0,
+            totalKeys: 0, correctKeys: 0, startTime: 0
         };
 
-        // =============== 模式切换 ===============
-        function startMode(m, targetLevel = 0) {
+        function startMode(m, sub = '') {
             initAudioEngine();
-            S.active = true; S.mode = m; S.score = 0; S.hp = 5; S.combo = 0;
-            S.targets = []; S.locked = null;
+            S.active = true; S.mode = m; S.subMode = sub; S.score = 0; S.hp = 5; S.combo = 0;
+            S.targets = []; S.locked = null; S.totalKeys = 0; S.correctKeys = 0; S.startTime = performance.now();
+            
             document.getElementById('homeScreen').classList.add('hidden');
             document.getElementById('gameHud').classList.remove('hidden');
             document.getElementById('resultOverlay').classList.add('hidden');
             document.getElementById('playArea').innerHTML = '';
             
-            if(m === 'breakthrough') {
-                document.getElementById('boxLevel').classList.remove('hidden');
-            } else {
-                document.getElementById('boxLevel').classList.add('hidden');
-            }
+            // UI 控制
+            document.getElementById('boxLevel').classList.toggle('hidden', m !== 'breakthrough');
+            document.getElementById('btnEndPrac').classList.toggle('hidden', m !== 'cpp_prac');
+            document.getElementById('boxWPM').classList.toggle('hidden', m !== 'cpp_prac');
+            document.getElementById('boxAcc').classList.toggle('hidden', m !== 'cpp_prac');
+            document.getElementById('boxHp').classList.toggle('hidden', m === 'cpp_prac' || m === 'breakthrough');
+            document.getElementById('boxTime').classList.toggle('hidden', m !== 'breakthrough');
 
-            if(m === 'simple' || m === 'breakthrough') {
-                document.getElementById('boxHp').classList.add('hidden');
-                document.getElementById('boxTime').classList.remove('hidden');
-                // 中文化：得分和进度
-                document.getElementById('labelMain').innerText = (m==='simple'?'得分:':'进度:');
-                if(m==='breakthrough') {
-                    initLevel(targetLevel); 
-                } else { 
-                    S.timer=60; S.speed=1.0; S.interval=1500; 
-                }
-            } else {
-                document.getElementById('boxHp').classList.remove('hidden');
-                document.getElementById('boxTime').classList.add('hidden');
-                // 中文化：得分
+            if(m === 'breakthrough') {
+                S.levelIdx = 0; // 默认从第一关开始，除非逻辑调整
+                document.getElementById('labelMain').innerText = '进度:';
+                initLevel(S.levelIdx); 
+            } else if (m === 'cpp_prac') {
+                document.getElementById('labelMain').innerText = '按键:';
+                S.speed=1.0; S.interval=1500; 
+            } else { // cpp挑战 / endless
                 document.getElementById('labelMain').innerText = '得分:';
                 S.speed=1.0; S.interval=1500;
             }
+
             S.lastSpawn = S.lastTick = performance.now();
             updateHUD();
             requestAnimationFrame(gameLoop);
@@ -279,32 +362,11 @@
             S.hitCount = 0; S.timer = l.time; S.speed = l.speed; S.interval = l.interval;
         }
 
-        function showComboEffect(n) {
-            if(n < 3) return;
-            const p = document.getElementById('combo-popup');
-            p.innerText = `x${n} 连击！`;
-            p.classList.remove('animate-combo');
-            void p.offsetWidth;
-            p.classList.add('animate-combo');
-        }
-
-        function handleLockedError() {
-            beep(100, 0.1, 'sawtooth');
-            S.combo = 0;
-            updateHUD();
-            if (S.locked && S.locked.el) {
-                S.locked.el.classList.remove('error-shake');
-                void S.locked.el.offsetWidth;
-                S.locked.el.classList.add('error-shake');
-            }
-        }
-
-        // =============== 游戏逻辑 ===============
         function gameLoop(time) {
             if(!S.active) return;
             if(time - S.lastSpawn > S.interval) { spawn(); S.lastSpawn = time; }
             if(time - S.lastTick > 1000) {
-                if(S.mode==='simple' || S.mode==='breakthrough') { S.timer--; if(S.timer<=0) checkFinish(); }
+                if(S.mode==='breakthrough') { S.timer--; if(S.timer<=0) checkFinish(); }
                 S.lastTick = time; updateHUD();
             }
             for(let i=S.targets.length-1; i>=0; i--) {
@@ -320,16 +382,11 @@
             if(content.type === 'word') {
                 for(let c of content.text) { 
                     let s = document.createElement('span'); 
-                    if(c === ' ') {
-                        s.innerText = '␣';
-                        s.className = 'space-char';
-                    } else {
-                        s.innerText = c; 
-                    }
+                    if(c === ' ') { s.innerText = '␣'; s.className = 'space-char'; } 
+                    else { s.innerText = c; }
                     el.appendChild(s); 
                 }
             } else { el.innerText = content.text; }
-            
             const w = content.type==='word' ? content.text.length*12+30 : 50;
             const x = Math.random()*(480-w)+10; el.style.left = x+"px"; el.style.top = "-50px";
             document.getElementById('playArea').appendChild(el);
@@ -338,72 +395,59 @@
 
         function getRand() {
             let pool = [];
-            if(S.mode==='simple') pool = DIC.letters.concat(DIC.numbers);
-            else if(S.mode==='cpp') pool = DIC.keywords.concat(DIC.symbols);
-            else if(S.mode==='breakthrough') LEVELS[S.levelIdx].pool.forEach(p=>pool=pool.concat(DIC[p]));
-            else { 
+            // 挑战模式和练习模式公用同一套分级词库逻辑
+            if(S.mode === 'cpp' || S.mode === 'cpp_prac') {
+                if(S.subMode === 'simple') pool = DIC.cpp_simple.concat(DIC.symbols_basic);
+                else if(S.subMode === 'hard') pool = DIC.cpp_hard.concat(DIC.symbols_adv);
+                else pool = DIC.cpp_all.concat(DIC.symbols);
+            } else if(S.mode === 'breakthrough') {
+                LEVELS[S.levelIdx].pool.forEach(p=>pool=pool.concat(DIC[p]));
+            } else { // endless
                 let r = Math.random(); 
-                if(r < 0.15) return {type:'word', text:DIC.keywords[Math.floor(Math.random()*DIC.keywords.length)]};
-                pool = DIC.letters.concat(DIC.symbols);
+                if(r < 0.15) return {type:'word', text:DIC.cpp_all[Math.floor(Math.random()*DIC.cpp_all.length)]};
+                pool = DIC.letters.concat(DIC.symbols_basic);
             }
             let res = pool[Math.floor(Math.random()*pool.length)];
             return res.length > 1 ? {type:'word', text:res} : {type:'char', text:res};
         }
 
-        // =============== 交互判定 ===============
         window.addEventListener('keydown', e => {
-            if(!S.active || ['Shift','Control','Alt','Meta','CapsLock'].includes(e.key)) return;
+            if(!S.active || ['Shift','Control','Alt','Meta','CapsLock','Process','Tab'].includes(e.key)) return;
             initAudioEngine();
-
+            if(e.key === 'Escape' && S.mode === 'cpp_prac') { checkFinish(); return; }
+            S.totalKeys++;
             if(S.locked) {
                 if(e.key === S.locked.text[S.locked.idx]) {
-                    beep(800, 0.05); 
+                    S.correctKeys++; beep(800, 0.05); 
                     S.locked.el.classList.remove('error-shake');
                     S.locked.el.children[S.locked.idx].classList.add('char-typed');
                     S.locked.idx++; 
                     if(S.locked.idx === S.locked.text.length) finalize(S.targets.indexOf(S.locked));
-                } else {
-                    handleLockedError();
-                }
+                } else { handleLockedError(); }
                 return;
             }
-
             let found = -1, maxY = -100;
             for(let i=0; i<S.targets.length; i++) {
                 if(S.targets[i].text[0] === e.key && S.targets[i].y > maxY) { maxY = S.targets[i].y; found = i; }
             }
-
             if(found !== -1) {
-                const t = S.targets[found];
+                S.correctKeys++; const t = S.targets[found];
                 if(t.type === 'char') { beep(800, 0.05); finalize(found); }
-                else { 
-                    beep(600, 0.05); S.locked = t; t.el.classList.add('locked'); 
-                    t.el.children[0].classList.add('char-typed'); t.idx = 1; 
-                }
-            } else {
-                beep(100, 0.1, 'sawtooth'); S.combo = 0; updateHUD();
-            }
+                else { beep(600, 0.05); S.locked = t; t.el.classList.add('locked'); t.el.children[0].classList.add('char-typed'); t.idx = 1; }
+            } else { beep(100, 0.1, 'sawtooth'); S.combo = 0; updateHUD(); }
         });
 
         function finalize(i) {
-            const t = S.targets[i]; 
-            t.el.classList.remove('locked', 'error-shake');
-            t.el.classList.add('explode');
-            
-            S.combo++; showComboEffect(S.combo);
-            
-            if(S.mode==='breakthrough') { 
-                S.hitCount++; if(S.hitCount >= LEVELS[S.levelIdx].target) checkFinish(); 
-            } else {
-                let b = t.type==='word' ? t.text.length*15 : 10; 
-                S.score += Math.floor(b*(1+S.combo*0.05));
-                if(S.mode==='endless' || S.mode==='cpp') { 
-                    // 1. 速度控制：最高速度降至 1.8，且需要打满 16000 分才会满速
-                    S.speed = Math.min(1.8, 1.0 + S.score / 20000); 
-                    
-                    // 2. 间隔控制：最快间隔降至 1100ms，每 1000 分才减少 20ms
-                    S.interval = Math.max(1100, 1500 - S.score * 0.02); 
-                }
+            const t = S.targets[i]; t.el.classList.remove('locked', 'error-shake'); t.el.classList.add('explode');
+            S.combo++; if(S.combo >= 3) {
+                const p = document.getElementById('combo-popup'); p.innerText = `连击 x${S.combo}`;
+                p.classList.remove('animate-combo'); void p.offsetWidth; p.classList.add('animate-combo');
+            }
+            if(S.mode==='breakthrough') { S.hitCount++; if(S.hitCount >= LEVELS[S.levelIdx].target) checkFinish(); } 
+            else {
+                let b = t.type==='word' ? t.text.length*15 : 10; S.score += Math.floor(b*(1+S.combo*0.05));
+                if(S.mode==='endless') { S.speed = Math.min(1.8, 1.0 + S.score / 20000); S.interval = Math.max(1100, 1500 - S.score * 0.02); }
+                if(S.mode==='cpp') { S.speed = Math.min(1.2, 1.0 + S.score / 15000); S.interval = Math.max(1300, 1500 - S.score * 0.01); }
             }
             updateHUD();
             setTimeout(() => { if(t.el.parentNode) t.el.parentNode.removeChild(t.el); }, 150);
@@ -412,58 +456,90 @@
 
         function handleCrash(i) {
             const t = S.targets[i]; if(t.el.parentNode) t.el.parentNode.removeChild(t.el);
-            S.targets.splice(i, 1); 
-            if(S.locked === t) S.locked = null; 
-            S.combo = 0; 
+            S.targets.splice(i, 1); if(S.locked === t) S.locked = null; S.combo = 0; 
             if(S.mode==='cpp' || S.mode==='endless') {
-                S.hp--; beep(50, 0.3, 'sawtooth'); flash();
-                if(S.hp <= 0) finish("装甲损毁", `最终得分: ${S.score}`);
+                S.hp--; beep(50, 0.3, 'sawtooth');
+                const o = document.getElementById('hurtOverlay'); o.style.opacity = 0.5; setTimeout(()=>o.style.opacity=0, 100);
+                const c = document.getElementById('game-container'); c.classList.add('shake'); setTimeout(()=>c.classList.remove('shake'), 200);
+                if(S.hp <= 0) checkFinish();
             }
             updateHUD();
         }
 
-        // =============== UI 辅助 ===============
+        function handleLockedError() {
+            beep(100, 0.1, 'sawtooth'); S.combo = 0; updateHUD();
+            if (S.locked && S.locked.el) { S.locked.el.classList.remove('error-shake'); void S.locked.el.offsetWidth; S.locked.el.classList.add('error-shake'); }
+        }
+
         function updateHUD() {
-            document.getElementById('valMain').innerText = (S.mode==='breakthrough'? `${S.hitCount}/${LEVELS[S.levelIdx].target}` : S.score);
+            if(S.mode === 'breakthrough') document.getElementById('valMain').innerText = `${S.hitCount}/${LEVELS[S.levelIdx].target}`;
+            else if(S.mode === 'cpp_prac') document.getElementById('valMain').innerText = S.correctKeys;
+            else document.getElementById('valMain').innerText = S.score;
             document.getElementById('valLevel').innerText = S.levelIdx + 1;
             document.getElementById('valTime').innerText = S.timer + "s";
             document.getElementById('valHp').innerText = "♥".repeat(Math.max(0, S.hp));
             document.getElementById('valInterval').innerText = Math.round(S.interval);
             document.getElementById('valSpeed').innerText = S.speed.toFixed(2);
-        }
-
-        function flash() {
-            const o = document.getElementById('hurtOverlay'); o.style.opacity = 0.5; setTimeout(()=>o.style.opacity=0, 100);
-            const c = document.getElementById('game-container'); c.classList.add('shake'); setTimeout(()=>c.classList.remove('shake'), 200);
-        }
-
-        function finish(title, desc) {
-            S.active = false;
-            document.getElementById('resTitle').innerText = title;
-            document.getElementById('resDesc').innerText = desc;
-            
-            document.getElementById('resActionBtn').innerText = "重新挑战";
-            document.getElementById('resActionBtn').onclick = () => startMode(S.mode, S.levelIdx);
-            document.getElementById('resultOverlay').classList.remove('hidden');
+            if(S.mode === 'cpp_prac') {
+                let acc = S.totalKeys > 0 ? Math.floor((S.correctKeys / S.totalKeys) * 100) : 100;
+                document.getElementById('valAcc').innerText = acc + "%";
+                let elapsedMin = (performance.now() - S.startTime) / 60000;
+                let wpm = elapsedMin > 0.05 ? Math.round((S.correctKeys / 5) / elapsedMin) : 0;
+                document.getElementById('valWPM').innerText = wpm;
+            }
         }
 
         function checkFinish() {
-            if(S.mode==='simple') finish("时间耗尽", `总得分: ${S.score}`);
-            else if(S.mode==='breakthrough') {
-                if(S.hitCount >= LEVELS[S.levelIdx].target) {
-                    if(S.levelIdx >= LEVELS.length - 1) {
-                        finish("全关卡通关", "恭喜！你已完成所有特训关卡。");
-                    } else {
+            let title = "结算完成", desc = "";
+            if (S.mode === 'breakthrough') {
+                if (S.hitCount >= LEVELS[S.levelIdx].target) {
+                    if (S.levelIdx >= LEVELS.length - 1) title = "全关通关";
+                    else {
                         S.active = false;
-                        document.getElementById('resTitle').innerText = "挑战成功";
-                        document.getElementById('resDesc').innerText = `即将进入: ${LEVELS[S.levelIdx+1].name}`;
-                        
-                        document.getElementById('resActionBtn').innerText = "进入下一关";
-                        document.getElementById('resActionBtn').onclick = () => { startMode('breakthrough', S.levelIdx + 1); };
+                        document.getElementById('resTitle').innerText = "过关！";
+                        document.getElementById('resStats').innerHTML = `即将进入: ${LEVELS[S.levelIdx+1].name}`;
+                        document.getElementById('resActionBtn').innerText = "下一关";
+                        document.getElementById('resActionBtn').onclick = () => startMode('breakthrough', S.levelIdx + 1);
                         document.getElementById('resultOverlay').classList.remove('hidden');
+                        return;
                     }
-                } else finish("挑战失败", "未能在规定时间内达到目标。");
+                } else title = "挑战失败";
+            } else if (S.mode === 'cpp_prac') title = "练习报告";
+            else title = "挑战结束";
+            doFinish(title, desc);
+        }
+
+        function doFinish(title, desc) {
+            S.active = false;
+            document.getElementById('resTitle').innerText = title;
+            let acc = S.totalKeys > 0 ? Math.floor((S.correctKeys / S.totalKeys) * 100) : 100;
+            let elapsedMin = (performance.now() - S.startTime) / 60000;
+            let wpm = elapsedMin > 0.05 ? Math.round((S.correctKeys / 5) / elapsedMin) : 0;
+            let modeKey = S.subMode ? `${S.mode}_${S.subMode}` : S.mode;
+            let rec = saveAndCheckRecord(modeKey, wpm, acc, S.score);
+            let badge = rec.isNewRecord ? `<span style="background:var(--success); color:var(--bg); padding:2px 8px; font-size:0.8rem; margin-left:10px; border-radius:3px; animation: flashInfo 1s infinite;">新记录!</span>` : '';
+            
+            let statsHtml = '';
+            if (S.mode === 'cpp_prac') {
+                statsHtml = `
+                    <div>有效击键：<b>${S.correctKeys}</b></div>
+                    <div>准确率：<b style="color:${acc>=90?'green':'red'}">${acc}%</b></div>
+                    <div>输入速度：<b>${wpm} WPM</b> ${badge}</div>
+                    <hr style="border:1px dashed #ccc; margin:15px 0">
+                    <div style="font-size:0.9rem; color:#888">个人最佳: ${rec.bestWPM} WPM (${rec.bestAcc}%)</div>
+                `;
+            } else {
+                statsHtml = `
+                    <div>最终得分：<b>${S.score}</b> ${badge}</div>
+                    <div>准确率：<b>${acc}%</b></div>
+                    <hr style="border:1px dashed #ccc; margin:15px 0">
+                    <div style="font-size:0.9rem; color:#888">该模式历史最高: ${rec.bestScore}</div>
+                `;
             }
+            document.getElementById('resStats').innerHTML = statsHtml;
+            document.getElementById('resActionBtn').innerText = "再来一次";
+            document.getElementById('resActionBtn').onclick = () => startMode(S.mode, S.subMode);
+            document.getElementById('resultOverlay').classList.remove('hidden');
         }
     </script>
 </body>
