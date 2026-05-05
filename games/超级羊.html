@@ -139,10 +139,10 @@
 
     // 修复 Bug：增加 isAnimating 动画锁，升级撤回逻辑为 moveHistory 历史栈
     let state = {
-        active: false, level: 1, highestUnlocked: 3,
+        active: false, level: 1, highestUnlocked: 1,
         allCards: [], dockCards: [], moveHistory: [],
         isAnimating: false,
-        undoCount: 3, shuffleCount: 3
+        undoCount: 5, shuffleCount: 5
     };
 
     function formatCardText(str) {
