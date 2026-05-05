@@ -176,11 +176,15 @@
         o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
     }
 
-    function initGame(lvl) {
+    function initGame(lvl, keepProps = false) {
         state.active = true; state.level = lvl;
         state.allCards = []; state.dockCards = []; state.moveHistory = [];
         state.isAnimating = false;
-        state.undoCount = 3; state.shuffleCount = 3;
+        
+        if (!keepProps) {
+            state.undoCount = 5; 
+            state.shuffleCount = 5;
+        }
         
         document.getElementById('startScreen').classList.add('hidden');
         document.getElementById('resultOverlay').classList.add('hidden');
@@ -189,7 +193,11 @@
         
         const uBtn = document.getElementById('undoBtn');
         const sBtn = document.getElementById('shuffleBtn');
-        uBtn.disabled = false; sBtn.disabled = false;
+        
+   
+        uBtn.disabled = (state.undoCount <= 0); 
+        sBtn.disabled = (state.shuffleCount <= 0);
+        
         uBtn.innerText = `撤回 (${state.undoCount})`;
         sBtn.innerText = `洗牌 (${state.shuffleCount})`;
         
@@ -414,8 +422,8 @@
             nextBtn.id = 'nextLvlBtn';
             nextBtn.className = 'level-btn';
             nextBtn.style.textAlign = 'center';
-            nextBtn.innerText = '直接进入下一关';
-            nextBtn.onclick = () => initGame(state.level + 1);
+            nextBtn.innerText = '直接进入下一关 (道具剩余次数将继承)';            
+            nextBtn.onclick = () => initGame(state.level + 1, true);
             resOverlay.appendChild(nextBtn);
         }
     }
