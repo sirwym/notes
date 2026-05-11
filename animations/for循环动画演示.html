@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C++ 循环拆解演示器 - 极客版</title>
+    <style>
+        :root {
+            --cell-size: 50px;
+            --gap-size: 4px;
+            --step-size: 54px; 
+            --bg-dark: #1a1a2e;
+            --panel-bg: #16213e;
+            --terminal-green: #4ade80;
+            --highlight-color: rgba(246, 173, 85, 0.4);
+            --highlight-border: #f6ad55;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace; 
+            background-color: var(--bg-dark);
+            color: #ecf0f1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 15px;
+            margin: 0;
+            min-height: 100vh;
+        }
+
+        h1 { margin-bottom: 5px; color: var(--terminal-green); text-transform: uppercase; letter-spacing: 2px; text-align: center; }
+        .subtitle { font-size: 16px; color: #a0aec0; margin-bottom: 20px; font-weight: bold; text-align: center; padding: 0 10px;}
+
+        /* --- 主容器：自适应网格布局 --- */
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto;
+            gap: 20px;
+            width: 95%;
+            max-width: 1200px;
+            margin-bottom: 30px;
+        }
+
+        /* 响应式断点：小屏幕下自动折叠为单列 */
+        @media (max-width: 900px) {
+            .dashboard { grid-template-columns: 1fr; }
+            .console-area { grid-column: 1 / -1 !important; }
+        }
+
+        /* 面板通用样式 */
+        .panel {
+            background-color: var(--panel-bg);
+            border: 4px solid #4a5568;
+            box-shadow: 6px 6px 0px #000;
+            padding: 20px;
+            position: relative;
+            box-sizing: border-box;
+        }
+        
+        .panel-title {
+            position: absolute;
+            top: -14px; left: 15px;
+            background: var(--bg-dark);
+            padding: 0 10px;
+            color: #63b3ed; font-weight: bold; font-size: 14px;
+            border-left: 2px solid #63b3ed;
+            border-right: 2px solid #63b3ed;
+        }
+
+        /* 修复核心：独立的滚动包装器，防止 overflow 裁剪绝对定位的标题 */
+        .scroll-wrapper {
+            overflow-x: auto;
+            width: 100%;
+            padding-top: 5px;
+        }
+
+        /* --- 区域1：配置与代码映射 --- */
+        .code-config-area {
+            font-size: 18px; line-height: 2.2;
+            color: #e2e8f0;
+        }
+
+        .code-keyword { color: #f6ad55; font-weight: bold; }
+        .code-var { color: #63b3ed; }
+        .code-fn { color: #4fd1c5; }
+        
+        .inline-input {
+            background: #000; border: 1px solid #4a5568;
+            color: #f687b3; font-family: inherit; font-size: 16px; font-weight: bold;
+            text-align: center; width: 45px; padding: 2px; outline: none;
+            display: inline-block;
+        }
+        .inline-input:focus { border-color: var(--terminal-green); }
+
+        /* 代码高亮块 */
+        .code-segment {
+            display: inline-block;
+            padding: 0 4px;
+            border-radius: 4px;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+        .active-segment {
+            background-color: var(--highlight-color);
+            border-color: var(--highlight-border);
+            box-shadow: 0 0 10px rgba(246, 173, 85, 0.5);
+            color: #fff;
+        }
+
+        .controls { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+        button {
+            padding: 10px 15px; font-size: 14px; font-weight: bold; font-family: inherit;
+            border: 3px solid #000; cursor: pointer; transition: transform 0.1s; box-shadow: 3px 3px 0px #000;
+        }
+        button:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #000; }
+        #stepBtn { background-color: #f6ad55; color: #000; }
+        #autoBtn { background-color: var(--terminal-green); color: #000; }
+        #resetBtn { background-color: #a0aec0; color: #000; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: translate(3px, 3px); box-shadow: 0 0 0; }
+
+        /* --- 区域2：内存监控与运行图 --- */
+        .visual-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-width: 0; 
+        }
+
+        /* 内存块 */
+        .ram-monitor {
+            background: #000; border: 2px solid #4a5568; padding: 15px;
+            display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+        }
+        .ram-label { color: #a0aec0; font-weight: bold; }
+        .ram-box {
+            width: 60px; height: 60px; border: 3px dashed #63b3ed;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 28px; color: #fff; font-weight: bold;
+            background: rgba(99, 179, 237, 0.1);
+            transition: all 0.3s;
+        }
+        .ram-update {
+            background: rgba(74, 222, 128, 0.3); border-color: var(--terminal-green); color: var(--terminal-green);
+            transform: scale(1.1);
+        }
+
+        /* 地图区 */
+        .game-board {
+            background-color: #000; padding: 15px; border: 2px solid #2d3748;
+            display: flex; justify-content: flex-start;
+        }
+        
+        .grid-container { 
+            display: grid; 
+            gap: var(--gap-size); 
+            position: relative; 
+            padding: 10px; 
+            background: #1a202c;
+            border: 2px solid #2d3748;
+            min-width: max-content; 
+        }
+        
+        .cell { width: var(--cell-size); height: var(--cell-size); background-color: #2d3748; box-shadow: inset -4px -4px 0px rgba(0,0,0,0.3); position: relative; }
+        .cell-coord { position: absolute; bottom: 2px; right: 4px; font-size: 10px; color: rgba(255,255,255,0.4); }
+
+        .target { background-color: #276749; } 
+        .target::before { content: ''; position: absolute; bottom: 8px; left: 15px; width: 4px; height: 35px; background-color: #cbd5e0; border-right: 2px solid #718096; }
+        .target::after { content: ''; position: absolute; top: 10px; left: 19px; width: 18px; height: 12px; background-color: #e94560; animation: flutter 0.4s infinite alternate steps(2); }
+        @keyframes flutter { 0% { transform: skewY(0deg) scaleX(1); } 100% { transform: skewY(10deg) scaleX(0.9); } }
+
+        /* 主角系统：绝对居中 */
+        #player-wrapper { 
+            position: absolute; 
+            top: 10px; 
+            left: 10px; 
+            width: var(--cell-size); 
+            height: var(--cell-size); 
+            z-index: 10; 
+            transition: transform 0.5s ease-in-out; 
+            display: flex; justify-content: center; align-items: center; 
+        }
+        #player-sprite { width: 30px; height: 30px; background-color: #3182ce; border: 3px solid #e2e8f0; box-shadow: inset -4px -4px 0px rgba(0,0,0,0.4); position: relative; animation: idle 1s infinite alternate steps(2); }
+        #visor { position: absolute; top:10px; left:20px; width:6px; height:10px; background: #ecc94b; box-shadow: 0 0 5px #ecc94b; animation: blink 4s infinite; }
+        @keyframes idle { 0% { transform: scaleY(1); } 100% { transform: scaleY(0.9) translateY(2px); } }
+        @keyframes blink { 0%, 96% { opacity: 1; } 98% { opacity: 0; } 100% { opacity: 1; } }
+        .jumping { animation: jumpArc 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important; }
+        @keyframes jumpArc { 0% { margin-top: 0; } 50% { margin-top: -35px; } 100% { margin-top: 0; } }
+
+        /* --- 区域3：底层调试日志 (下方宽屏) --- */
+        .console-area {
+            grid-column: 1 / -1; 
+            background: #000; border: 4px solid #4a5568;
+            height: 220px; padding: 15px; box-sizing: border-box;
+            overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
+            box-shadow: 6px 6px 0px #000;
+        }
+        .log-line { font-size: 14px; line-height: 1.5; color: #a0aec0; border-bottom: 1px dashed #2d3748; padding-bottom: 4px;}
+        .log-sys { color: #f6ad55; font-weight: bold; }
+        .log-success { color: var(--terminal-green); font-weight: bold; }
+        .log-warn { color: #f56565; font-weight: bold; }
+
+    </style>
+</head>
+<body>
+
+    <h1>[ DEBUGGER ] C++ 循环底层透视仪</h1>
+    <div class="subtitle">>> 减慢时间流速，观察计算机在每一微秒到底做了什么</div>
+
+    <div class="dashboard">
+        
+        <div class="panel code-config-area">
+            <div class="panel-title">SOURCE CODE (.cpp)</div>
+            
+            <div class="scroll-wrapper">
+                <div style="margin-bottom: 10px; font-size: 14px; color:#a0aec0;">
+                    // 1. 设置循环参数，点击 [STEP] 开始单步调试
+                </div>
+
+                <span class="code-keyword">for</span> ( 
+                <span class="code-segment" id="seg-init">
+                    <span class="code-keyword">int</span> <span class="code-var">i</span> = <input type="text" id="in-start" class="inline-input" value="1">
+                </span> ; 
+                
+                <span class="code-segment" id="seg-cond">
+                    <span class="code-var">i</span> 
+                    <select id="in-op" class="inline-input" style="width:50px;">
+                        <option value="<">&lt;</option>
+                        <option value="<=" selected>&lt;=</option>
+                    </select>
+                    <input type="text" id="in-end" class="inline-input" value="4">
+                </span> ; 
+
+                <span class="code-segment" id="seg-inc">
+                    <select id="in-step" class="inline-input" style="width:70px;">
+                        <option value="i++" selected>i++</option>
+                        <option value="i+=2">i+=2</option>
+                    </select>
+                </span> ) {<br>
+                
+                <div style="margin-left: 40px; margin-top: 10px; margin-bottom: 10px;">
+                    <span class="code-segment" id="seg-body">
+                        <span class="code-fn">moveForward</span>();
+                    </span>
+                </div>
+                }
+
+                <div class="controls">
+                    <button id="stepBtn">[ STEP ] 单步执行</button>
+                    <button id="autoBtn">[ PLAY ] 自动演示</button>
+                    <button id="resetBtn">[ RST  ] 重置引擎</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="visual-area">
+            <div class="panel ram-monitor">
+                <div class="panel-title">RAM MONITOR (内存监控)</div>
+                <span class="ram-label">Variable<br><span style="color:#63b3ed; font-size:20px;">int i</span> =</span>
+                <div class="ram-box" id="ram-val">?</div>
+                <div style="font-size: 12px; color: #718096; margin-left: auto; text-align: right;">
+                    &lt;&lt; 实时追踪<br>变量值变化
+                </div>
+            </div>
+
+            <div class="panel game-board">
+                <div class="panel-title">RUNTIME ENVIRONMENT (执行环境)</div>
+                <div class="scroll-wrapper">
+                    <div class="grid-container" id="grid">
+                        </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="console-area" id="console">
+            <div class="log-line"><span class="log-sys">[ INIT ]</span> 调试引擎已启动，等待指令传入...</div>
+        </div>
+
+    </div>
+
+    <div style="display:none;">
+        <div id="player-wrapper">
+            <div id="player-sprite"><div id="visor"></div></div>
+        </div>
+    </div>
+
+    <script>
+        // === 地图配置 ===
+        const COLS = 8;
+        const TARGET_X = 6;
+        const gridEl = document.getElementById('grid');
+        const playerEl = document.getElementById('player-wrapper');
+        const spriteEl = document.getElementById('player-sprite');
+        
+        // 渲染地图
+        gridEl.innerHTML = '';
+        gridEl.style.gridTemplateColumns = `repeat(${COLS}, var(--cell-size))`;
+        for (let x = 0; x < COLS; x++) {
+            let cell = document.createElement('div');
+            cell.className = 'cell';
+            if (x === TARGET_X) cell.classList.add('target');
+            let coord = document.createElement('span');
+            coord.className = 'cell-coord'; coord.textContent = x;
+            cell.appendChild(coord);
+            gridEl.appendChild(cell);
+        }
+        
+        // 主角节点挂载在网格内部，实现完美的内边距居中
+        gridEl.appendChild(playerEl);
+
+        // === 状态机逻辑 ===
+        let state = 'READY'; // READY -> INIT -> COND -> (BODY -> INC -> COND) -> END
+        let currentX = 0;
+        let currentI = null;
+        let isAutoPlaying = false;
+        let autoPlayTimer = null;
+
+        // 用户输入值
+        let vStart, vOp, vEnd, vStepMode;
+
+        const uiStart = document.getElementById('in-start');
+        const uiOp = document.getElementById('in-op');
+        const uiEnd = document.getElementById('in-end');
+        const uiStep = document.getElementById('in-step');
+        const ramVal = document.getElementById('ram-val');
+        const consoleEl = document.getElementById('console');
+        
+        const btnStep = document.getElementById('stepBtn');
+        const btnAuto = document.getElementById('autoBtn');
+        const btnReset = document.getElementById('resetBtn');
+
+        function log(msg) {
+            let line = document.createElement('div');
+            line.className = 'log-line';
+            line.innerHTML = msg;
+            consoleEl.appendChild(line);
+            consoleEl.scrollTop = consoleEl.scrollHeight; // 自动滚到底部
+        }
+
+        function clearHighlights() {
+            document.querySelectorAll('.code-segment').forEach(el => el.classList.remove('active-segment'));
+        }
+
+        function highlight(id) {
+            clearHighlights();
+            document.getElementById(id).classList.add('active-segment');
+        }
+
+        function updateRam(val) {
+            currentI = val;
+            ramVal.textContent = val;
+            ramVal.classList.add('ram-update');
+            setTimeout(() => ramVal.classList.remove('ram-update'), 300);
+        }
+
+        function movePlayer(steps) {
+            currentX += steps;
+            if (currentX >= COLS) currentX = COLS - 1; // 防出界
+            
+            const pxX = currentX * 54; // cell 50 + gap 4
+            playerEl.style.transform = `translateX(${pxX}px)`;
+            
+            if (steps > 1) {
+                spriteEl.classList.remove('jumping');
+                void spriteEl.offsetWidth; 
+                spriteEl.classList.add('jumping');
+            }
+        }
+
+        function resetAll() {
+            isAutoPlaying = false;
+            clearTimeout(autoPlayTimer);
+            state = 'READY';
+            currentX = 0;
+            currentI = null;
+            
+            // 恢复 UI
+            playerEl.style.transform = `translateX(0px)`;
+            playerEl.style.transition = 'none';
+            setTimeout(() => playerEl.style.transition = 'transform 0.5s ease-in-out', 50);
+            
+            ramVal.textContent = '?';
+            clearHighlights();
+            consoleEl.innerHTML = '';
+            log(`<span class="log-sys">[ SYS ]</span> 引擎已重置，等待参数配置...`);
+            
+            uiStart.disabled = false; uiOp.disabled = false; uiEnd.disabled = false; uiStep.disabled = false;
+            btnStep.disabled = false; btnAuto.disabled = false;
+        }
+
+        // 核心透视引擎单步逻辑
+        async function runNextStep() {
+            if (state === 'END') return;
+
+            // 1. 读取并锁定表单
+            if (state === 'READY') {
+                vStart = parseInt(uiStart.value);
+                vOp = uiOp.value; 
+                vEnd = parseInt(uiEnd.value);
+                vStepMode = uiStep.value;
+
+                if (isNaN(vStart) || isNaN(vEnd)) { log(`<span class="log-warn">[ ERR ]</span> 请输入合法的数字！`); return; }
+                
+                uiStart.disabled = true; uiOp.disabled = true; uiEnd.disabled = true; uiStep.disabled = true;
+                state = 'INIT';
+            }
+
+            // 安全转义输出符号
+            const safeOp = vOp === '<' ? '&lt;' : '&lt;=';
+
+            // 2. 状态机分发
+            if (state === 'INIT') {
+                highlight('seg-init');
+                updateRam(vStart);
+                log(`<span class="log-sys">[ 步骤 1: 初始化 ]</span> 计算机在内存中开辟了一块空间取名 i，并放入了数值 <b>${currentI}</b>。`);
+                state = 'COND';
+            } 
+            else if (state === 'COND') {
+                highlight('seg-cond');
+                let isTrue = false;
+                if (vOp === '<') isTrue = currentI < vEnd;
+                if (vOp === '<=') isTrue = currentI <= vEnd;
+
+                if (isTrue) {
+                    log(`<span class="log-sys">[ 步骤 2: 判断 ]</span> 检查 <b>${currentI} ${safeOp} ${vEnd}</b>。结果为 <span class="log-success">TRUE(成立)</span>，准许进入大括号内部。`);
+                    state = 'BODY';
+                } else {
+                    log(`<span class="log-sys">[ 步骤 2: 判断 ]</span> 检查 <b>${currentI} ${safeOp} ${vEnd}</b>。结果为 <span class="log-warn">FALSE(不成立)</span>，循环立刻终止。`);
+                    state = 'END';
+                }
+            } 
+            else if (state === 'BODY') {
+                highlight('seg-body');
+                let jumpDist = 1;
+                if (vStepMode.includes('+=')) {
+                    jumpDist = parseInt(vStepMode.split('+=')[1]);
+                }
+                
+                log(`<span class="log-sys">[ 步骤 3: 循环体 ]</span> 执行 moveForward()，装甲兵前进 <b>${jumpDist}</b> 格。`);
+                movePlayer(jumpDist);
+                state = 'INC';
+            } 
+            else if (state === 'INC') {
+                highlight('seg-inc');
+                let nextI = currentI;
+                
+                if (vStepMode === 'i++') nextI++;
+                else if (vStepMode.includes('+=')) nextI += parseInt(vStepMode.split('+=')[1]);
+                
+                log(`<span class="log-sys">[ 步骤 4: 步长更新 ]</span> 遇到大括号结尾，回头执行 <b>${vStepMode}</b>。内存中的 i 被更新为 <b>${nextI}</b>。`);
+                updateRam(nextI);
+                state = 'COND'; // 闭环！回到判断
+            }
+
+            // 结束判定
+            if (state === 'END') {
+                clearHighlights();
+                if (currentX === TARGET_X) {
+                    log(`<span class="log-success">[ FINISH ] 完美！装甲兵精准到达了红旗！循环执行完毕。</span>`);
+                } else {
+                    log(`<span class="log-warn">[ WARNING ] 循环结束，但装甲兵没有停在红旗上，请检查你的初始值和边界逻辑！</span>`);
+                }
+                btnStep.disabled = true;
+                btnAuto.disabled = true;
+                isAutoPlaying = false;
+            }
+
+            // 自动播放延时调度
+            if (isAutoPlaying && state !== 'END') {
+                autoPlayTimer = setTimeout(runNextStep, 1500); 
+            }
+        }
+
+        // 按钮事件
+        btnStep.addEventListener('click', () => {
+            isAutoPlaying = false;
+            clearTimeout(autoPlayTimer);
+            runNextStep();
+        });
+
+        btnAuto.addEventListener('click', () => {
+            if (isAutoPlaying) return; 
+            isAutoPlaying = true;
+            btnStep.disabled = true;
+            btnAuto.disabled = true;
+            runNextStep();
+        });
+
+        btnReset.addEventListener('click', resetAll);
+
+    </script>
+</body>
+</html>

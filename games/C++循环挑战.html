@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C++ 循环地牢探险 - 极客终极版</title>
+    <style>
+        :root {
+            --cell-size: 50px;
+            --gap-size: 4px;
+            --step-size: 54px; 
+            --bg-dark: #1a1a2e;
+            --panel-bg: #16213e;
+            --terminal-green: #4ade80;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace; 
+            background-color: var(--bg-dark);
+            color: #ecf0f1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 15px;
+            margin: 0;
+            min-height: 100vh;
+        }
+
+        h1 { margin-bottom: 5px; color: var(--terminal-green); text-transform: uppercase; letter-spacing: 2px; }
+        .level-title { font-size: 22px; color: #3ab795; margin-bottom: 5px; font-weight: bold; border-bottom: 2px dashed #3ab795; padding-bottom: 5px; }
+        p.desc { color: #a0aec0; margin-bottom: 15px; text-align: center; max-width: 700px; line-height: 1.5; font-weight: bold; font-size: 14px;}
+
+        .game-container {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        /* --- 地图区域 --- */
+        .game-board {
+            background-color: var(--panel-bg);
+            padding: 15px;
+            border: 4px solid #4a5568;
+            box-shadow: 8px 8px 0px #000; 
+            position: relative;
+        }
+
+        .grid-container {
+            display: grid;
+            gap: var(--gap-size);
+            background-color: #000;
+            padding: 10px;
+            border: 2px solid #2d3748;
+            position: relative; 
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            background-color: #2d3748;
+            box-shadow: inset -4px -4px 0px rgba(0,0,0,0.3), inset 4px 4px 0px rgba(255,255,255,0.1);
+            position: relative;
+        }
+
+        .cell-coord {
+            position: absolute;
+            bottom: 2px;
+            right: 4px;
+            font-size: 10px;
+            color: rgba(255,255,255,0.4);
+            font-weight: bold;
+        }
+
+        /* --- 纯 CSS 像素动效 (火焰 & 旗帜) --- */
+        .target { background-color: #276749; } 
+        .target::before {
+            content: ''; position: absolute;
+            bottom: 8px; left: 15px; width: 4px; height: 35px;
+            background-color: #cbd5e0; border-right: 2px solid #718096;
+        }
+        .target::after {
+            content: ''; position: absolute;
+            top: 10px; left: 19px; width: 18px; height: 12px;
+            background-color: #e94560; animation: flutter 0.4s infinite alternate steps(2);
+        }
+        @keyframes flutter {
+            0% { transform: skewY(0deg) scaleX(1); }
+            100% { transform: skewY(10deg) scaleX(0.9); }
+        }
+
+        .trap { background-color: #c53030; overflow: hidden; box-shadow: inset 0 0 10px #742a2a; }
+        .trap::before, .trap::after {
+            content: ''; position: absolute; background-color: #f56565;
+            width: 10px; height: 10px; animation: bubble 1.5s infinite linear;
+        }
+        .trap::before { top: 30px; left: 10px; }
+        .trap::after { top: 40px; left: 30px; animation-delay: 0.7s; animation-duration: 2s; }
+        @keyframes bubble {
+            0% { transform: translateY(0) scale(1); opacity: 0; }
+            20% { opacity: 1; }
+            100% { transform: translateY(-40px) scale(1.5); opacity: 0; }
+        }
+
+        /* --- 主角系统 (纯 CSS 像素) --- */
+        #player-wrapper {
+            position: absolute; top: 10px; left: 10px;
+            width: var(--cell-size); height: var(--cell-size);
+            z-index: 10; transition: transform 0.4s ease-in-out;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        #player-sprite {
+            width: 30px; height: 30px; background-color: #3182ce; 
+            border: 3px solid #e2e8f0; box-shadow: inset -4px -4px 0px rgba(0,0,0,0.4);
+            position: relative; transition: background-color 0.3s;
+            animation: idle 1s infinite alternate steps(2);
+        }
+
+        #visor {
+            position: absolute; background: #ecc94b; box-shadow: 0 0 5px #ecc94b; transition: all 0.2s;
+            animation: blink 4s infinite;
+        }
+
+        .jumping { animation: jumpArc 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important; }
+        .dead-anim { background-color: #718096 !important; border-color: #2d3748 !important; animation: none !important; }
+        .success-anim { background-color: #ecc94b !important; animation: spinWin 0.6s ease infinite !important; }
+
+        @keyframes idle { 0% { transform: scaleY(1); } 100% { transform: scaleY(0.9) translateY(2px); } }
+        @keyframes jumpArc { 0% { margin-top: 0; transform: scaleY(1); } 50% { margin-top: -35px; transform: scaleY(1.1); } 100% { margin-top: 0; transform: scaleY(1); } }
+        @keyframes spinWin { 0% { transform: translateY(0) rotate(0deg); } 100% { transform: translateY(0) rotate(360deg); } }
+        @keyframes blink { 0%, 96% { opacity: 1; } 98% { opacity: 0; } 100% { opacity: 1; } }
+
+        /* --- UI 与代码区 --- */
+        .panel { background-color: #000; padding: 20px; border: 4px solid #4a5568; width: 520px; box-shadow: 8px 8px 0px #000; }
+
+        /* 引导模式 */
+        .guided-code-area { font-size: 18px; text-align: left; margin-bottom: 20px; color: #e2e8f0; line-height: 2; background: #1a202c; padding: 15px; border: 2px solid #2d3748; }
+        
+        .code-keyword { color: #f6ad55; font-weight: bold; }
+        .code-var { color: #63b3ed; }
+        .inline-input { background: transparent; border: none; border-bottom: 2px dashed #4299e1; color: #f687b3; font-family: inherit; font-size: 18px; font-weight: bold; text-align: center; width: 40px; padding: 0 2px; outline: none; transition: all 0.2s; }
+        .inline-input:focus:not(:disabled) { border-bottom: 2px solid var(--terminal-green); background: rgba(74, 222, 128, 0.1); }
+        .op-input { width: 40px; color: #cbd5e0; }
+        .step-input { width: 60px; color: #cbd5e0; }
+        .locked-input { color: #48bb78 !important; border-bottom: none !important; pointer-events: none; }
+        .body-input { width: 90%; margin-top: 10px; margin-left: 20px; background: #000; border: 2px solid #4a5568; color: #ecc94b; font-family: inherit; font-size: 16px; font-weight: bold; padding: 10px; outline: none; resize: none; }
+        .body-input:focus:not(:disabled) { border-color: var(--terminal-green); }
+
+        /* 自由代码模式 (带语法高亮的黑科技 IDE) */
+        .editor-container {
+            display: none; position: relative; width: 100%; height: 350px; margin-bottom: 20px;
+            background: #1a202c; border: 2px solid var(--terminal-green); text-align: left;
+        }
+        .free-code-area, .highlight-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; box-sizing: border-box;
+            font-family: 'Courier New', monospace; font-size: 16px; font-weight: bold; line-height: 1.6;
+            padding: 15px; margin: 0; border: none; outline: none; white-space: pre-wrap; word-wrap: break-word; overflow-y: auto;
+        }
+        .free-code-area { color: transparent; background: transparent; caret-color: #ecc94b; resize: none; z-index: 2; }
+        .highlight-layer { z-index: 1; color: #e2e8f0; pointer-events: none; }
+
+        /* 语法高亮配色 */
+        .hl-kw { color: #f6ad55; } /* keyword */
+        .hl-fn { color: #63b3ed; } /* function */
+        .hl-nm { color: #f687b3; } /* number */
+        .hl-op { color: #4fd1c5; } /* operator */
+        .hl-cm, .hl-cm span { color: #718096 !important; font-style: italic; } /* comment 优先级最高 */
+
+        .controls { display: flex; gap: 15px; justify-content: center; margin-bottom: 15px; }
+        button { padding: 12px 20px; font-size: 16px; font-weight: bold; font-family: inherit; border: 3px solid #000; cursor: pointer; transition: transform 0.1s; box-shadow: 4px 4px 0px #000; }
+        button:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 2px 2px 0px #000; }
+        #runBtn { background-color: var(--terminal-green); color: #000; }
+        #resetBtn { background-color: #a0aec0; color: #000; }
+        #nextBtn { background-color: #f6ad55; color: #000; display: none; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: translate(4px, 4px); box-shadow: 0 0 0; }
+        #status { font-size: 15px; font-weight: bold; text-align: center; min-height: 48px; color: #63b3ed; background: #000; border: 2px solid #2d3748; padding: 10px;}
+
+        /* --- 底部文档 --- */
+        .docs-panel { background-color: var(--panel-bg); width: 800px; max-width: 90vw; padding: 15px 30px; border: 4px solid #4a5568; box-shadow: 8px 8px 0px #000; margin-bottom: 40px; }
+        .docs-panel h3 { color: var(--terminal-green); margin-top: 0; border-bottom: 2px dashed #4a5568; padding-bottom: 10px; }
+        .docs-grid { display: flex; gap: 40px; }
+        .docs-col { flex: 1; }
+        .docs-col ul { list-style: none; padding: 0; line-height: 1.8; color: #a0aec0; font-size: 14px;}
+        .docs-col li code { background: #000; padding: 2px 6px; border: 1px solid #4a5568; color: #ecc94b; }
+    </style>
+</head>
+<body>
+
+    <h1>[C++] 循环特训：从填空到原生IDE</h1>
+    <div class="level-title" id="levelTitle">加载中...</div>
+    <p class="desc" id="levelDesc">加载中...</p>
+
+    <div class="game-container">
+        <div class="game-board">
+            <div class="grid-container" id="grid">
+                <div id="player-wrapper">
+                    <div id="player-sprite"><div id="visor"></div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="guided-code-area" id="guidedArea">
+                <span class="code-keyword">for</span> ( <span class="code-keyword">int</span> <span class="code-var">i</span> = 
+                <input type="text" id="startVal" class="inline-input" autocomplete="off"> ; 
+                <span class="code-var">i</span> <input type="text" id="operator" class="inline-input op-input" autocomplete="off">
+                <input type="text" id="endVal" class="inline-input" autocomplete="off"> ; 
+                <input type="text" id="stepVal" class="inline-input step-input" autocomplete="off"> ) {<br>
+                <textarea id="cmdBody" class="body-input" rows="3" spellcheck="false"></textarea>
+                <br>}
+            </div>
+
+            <div class="editor-container" id="editorContainer">
+                <pre class="highlight-layer" id="highlightLayer"></pre>
+                <textarea class="free-code-area" id="freeArea" spellcheck="false"></textarea>
+            </div>
+
+            <div class="controls">
+                <button id="runBtn">[ RUN ] 编译运行</button>
+                <button id="resetBtn">[ RST ] 重新尝试</button>
+                <button id="nextBtn">[ >>> ] 接入下一关</button>
+            </div>
+            <div id="status">[ SYS ] 系统就绪，等待代码输入...</div>
+        </div>
+    </div>
+
+    <div class="docs-panel">
+        <h3>&lt; C++ API 文档 &gt;</h3>
+        <div class="docs-grid">
+            <div class="docs-col">
+                <ul>
+                    <li><code>moveForward();</code> : 向面朝方向前进 1 步。</li>
+                    <li><code>turnLeft();</code>    : 原地向左转体 90 度。</li>
+                    <li><code>turnRight();</code>   : 原地向右转体 90 度。</li>
+                </ul>
+            </div>
+            <div class="docs-col" style="color:#f6ad55; font-size:14px; font-weight:bold;">
+                // 高级关卡提示：<br>
+                // 第 8 关后，你将进入一片空白的原生 C++ IDE。<br>
+                // 没有任何提示，支持 Tab 键缩进。<br>
+                // 独立写出完整的循环逻辑，证明你的实力！
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 18关 超长进阶体系 (无任何提示版)
+        // ==========================================
+        const levels = [
+            // --- 阶段一：填空引导 (1-7) ---
+            { mode: 'guided', title: "Level 1：锁定终点", desc: "目标 x=5 (距离4步)。填入正确的结束数字。", cols: 7, rows: 1, target: {x: 5, y: 0}, traps: [], start: {x: 1, y: 0, dir: 0}, guided: { start: "1", op: "<", end: "", step: "i++", body: "moveForward();", locks: ['start', 'op', 'step', 'body'] } },
+            { mode: 'guided', title: "Level 2：边界符号", desc: "结束数字锁死为3，目标 x=4。把 < 改成正确的符号。", cols: 6, rows: 1, target: {x: 4, y: 0}, traps: [{x: 5, y: 0}], start: {x: 1, y: 0, dir: 0}, guided: { start: "1", op: "<", end: "3", step: "i++", body: "moveForward();", locks: ['start', 'end', 'step', 'body'] } },
+            { mode: 'guided', title: "Level 3：推算起点", desc: "条件锁死 i <= 5。距离3步，初始值 i 该填几？", cols: 8, rows: 1, target: {x: 6, y: 0}, traps: [{x: 7, y: 0}], start: {x: 3, y: 0, dir: 0}, guided: { start: "", op: "<=", end: "5", step: "i++", body: "moveForward();", locks: ['op', 'end', 'step', 'body'] } },
+            { mode: 'guided', title: "Level 4：步长跳跃", desc: "前方连环陷阱！步长改为 i+=2 进行跳跃！", cols: 9, rows: 1, target: {x: 7, y: 0}, traps: [{x: 2, y: 0}, {x: 4, y: 0}, {x: 6, y: 0}], start: {x: 1, y: 0, dir: 0}, guided: { start: "1", op: "<", end: "7", step: "", body: "moveForward();", locks: ['start', 'op', 'end', 'body'] } },
+            { mode: 'guided', title: "Level 5：时光倒流", desc: "主角面朝左。递减(i--)循环，填入正确的边界。", cols: 9, rows: 1, target: {x: 3, y: 0}, traps: [{x: 2, y: 0}], start: {x: 7, y: 0, dir: 180}, guided: { start: "7", op: ">", end: "", step: "i--", body: "moveForward();", locks: ['start', 'op', 'step', 'body'] } },
+            { mode: 'guided', title: "Level 6：悬崖边缘", desc: "体会 >= 的作用。目标 x=1，判断符号是？", cols: 7, rows: 1, target: {x: 1, y: 0}, traps: [{x: 0, y: 0}], start: {x: 5, y: 0, dir: 180}, guided: { start: "5", op: ">", end: "2", step: "i--", body: "moveForward();", locks: ['start', 'end', 'step', 'body'] } },
+            { mode: 'guided', title: "Level 7：反向大跳", desc: "向左跳跃闪避！写出复合递减步长，例如 i-=2。", cols: 10, rows: 1, target: {x: 1, y: 0}, traps: [{x:2,y:0},{x:4,y:0},{x:6,y:0},{x:8,y:0}], start: {x: 9, y: 0, dir: 180}, guided: { start: "9", op: ">", end: "1", step: "", body: "moveForward();", locks: ['start', 'op', 'end', 'body'] } },
+            
+            // --- 阶段二：初级 IDE 自由编程 (8-12) ---
+            { mode: 'free', title: "Level 8：原生 IDE 解锁", desc: "直行到达红旗处。", cols: 6, rows: 1, target: {x: 5, y: 0}, traps: [], start: {x: 1, y: 0, dir: 0}, freeCode: "" },
+            { mode: 'free', title: "Level 9：L型拐角", desc: "需要 2 个循环，结合转向命令。", cols: 6, rows: 6, target: {x: 4, y: 4}, traps: [{x:1, y:4}, {x:2, y:4}, {x:4, y:1}, {x:4, y:2}], start: {x: 1, y: 1, dir: 0}, freeCode: "" },
+            { mode: 'free', title: "Level 10：U型坑道", desc: "绕过火坑，需要 3 个连续的循环。", cols: 6, rows: 6, target: {x: 1, y: 4}, traps: [{x:2,y:2},{x:3,y:2},{x:4,y:2},{x:2,y:3},{x:3,y:3},{x:4,y:3}], start: {x: 1, y: 1, dir: 0}, freeCode: "" },
+            { mode: 'free', title: "Level 11：倒车入库", desc: "走到尽头后转两次身，然后再循环走回来。", cols: 6, rows: 1, target: {x: 1, y: 0}, traps: [], start: {x: 4, y: 0, dir: 270}, freeCode: "" },
+            { mode: 'free', title: "Level 12：阶梯步伐", desc: "用一个大循环，内部包含多个指令，实现下楼梯。", cols: 6, rows: 6, target: {x: 4, y: 4}, traps: [{x: 2, y: 1}, {x: 3, y: 2}, {x: 4, y: 3}], start: {x: 1, y: 1, dir: 0}, freeCode: "" },
+            
+            // --- 阶段三：高级算法路径 (13-18) ---
+            { mode: 'free', title: "Level 13：贪吃蛇 S 弯", desc: "路径：右3，下2，左3，下2，右3。", cols: 6, rows: 7, target: {x: 4, y: 5}, traps: [{x:1,y:2},{x:2,y:2},{x:3,y:2},{x:2,y:4},{x:3,y:4},{x:4,y:4}], start: {x: 1, y: 1, dir: 0}, freeCode: "" },
+            { mode: 'free', title: "Level 14：方形环游", desc: "顺时针绕着中心的火堆走一整圈，回到原点下方。", cols: 6, rows: 6, target: {x: 1, y: 2}, traps: [{x:2,y:2},{x:3,y:2},{x:2,y:3},{x:3,y:3}], start: {x: 1, y: 1, dir: 0}, freeCode: "" },
+            { mode: 'free', title: "Level 15：螺旋向内", desc: "一层层往中心走，仔细计算每次循环的步数。", cols: 7, rows: 7, target: {x: 3, y: 3}, traps: [], start: {x: 1, y: 1, dir: 0}, freeCode: "" },
+            { mode: 'free', title: "Level 16：螺旋逃生", desc: "从中心出发，一层层向外逃脱迷宫。", cols: 7, rows: 7, target: {x: 5, y: 1}, traps: [], start: {x: 3, y: 3, dir: 270}, freeCode: "" },
+            { mode: 'free', title: "Level 17：Z 字走廊", desc: "经典的 Z 型路径，注意长短不一的距离。", cols: 8, rows: 6, target: {x: 6, y: 4}, traps: [{x:2,y:2},{x:3,y:2},{x:4,y:2},{x:5,y:2},{x:2,y:3},{x:3,y:3},{x:4,y:3},{x:5,y:3}], start: {x: 1, y: 1, dir: 0}, freeCode: "" },
+            { mode: 'free', title: "Level 18：大师级八卦阵", desc: "终极考核：在庞大的迷宫中找到唯一通路！", cols: 8, rows: 8, target: {x: 6, y: 6}, 
+              traps: [{x:2,y:1},{x:2,y:2},{x:2,y:3},{x:4,y:3},{x:4,y:4},{x:4,y:5},{x:6,y:1},{x:6,y:2},{x:6,y:3},{x:1,y:5},{x:2,y:5},{x:1,y:6}], start: {x: 1, y: 1, dir: 0}, freeCode: "" }
+        ];
+
+        let currentLevelIdx = 0;
+        let pState = { x: 0, y: 0, dir: 0, logicDir: 0 };
+        const STEP_PX = 54; 
+
+        // DOM Elements
+        const gridEl = document.getElementById('grid');
+        const wrapperEl = document.getElementById('player-wrapper');
+        const spriteEl = document.getElementById('player-sprite');
+        const visorEl = document.getElementById('visor');
+        const guidedAreaEl = document.getElementById('guidedArea');
+        const editorContainer = document.getElementById('editorContainer');
+        const freeAreaEl = document.getElementById('freeArea');
+        const highlightLayer = document.getElementById('highlightLayer');
+        const statusEl = document.getElementById('status');
+        const runBtn = document.getElementById('runBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const nextBtn = document.getElementById('nextBtn');
+
+        const sleep = ms => new Promise(res => setTimeout(res, ms));
+
+        // =====================================
+        // 黑科技：IDE 语法高亮与 Tab 缩进系统
+        // =====================================
+        freeAreaEl.addEventListener('input', updateHighlight);
+        freeAreaEl.addEventListener('scroll', () => { highlightLayer.scrollTop = freeAreaEl.scrollTop; });
+
+        function updateHighlight() {
+            let code = freeAreaEl.value;
+            // 1. 实体转义防 XSS 和错位 (必须第一步)
+            code = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            
+            // 2. 注入颜色 (严格控制顺序！先处理操作符)
+            code = code.replace(/(\+\+|--|\+=|-=|&lt;=|&gt;=|&lt;|&gt;|=)/g, '<span class="hl-op">$1</span>'); 
+            
+            // 3. 处理关键字和函数名
+            code = code.replace(/\b(for|int)\b/g, '<span class="hl-kw">$1</span>'); 
+            code = code.replace(/\b(moveForward|turnLeft|turnRight)\b/g, '<span class="hl-fn">$1</span>'); 
+            code = code.replace(/\b(\d+)\b/g, '<span class="hl-nm">$1</span>'); 
+            
+            // 4. 最后处理注释
+            code = code.replace(/(\/\/.*)/g, '<span class="hl-cm">$1</span>'); 
+            
+            highlightLayer.innerHTML = code + '<br/>'; 
+        }
+
+        // Tab 键拦截：输入 4 个空格
+        freeAreaEl.addEventListener('keydown', function(e) {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                let start = this.selectionStart;
+                let end = this.selectionEnd;
+                this.value = this.value.substring(0, start) + "    " + this.value.substring(end);
+                this.selectionStart = this.selectionEnd = start + 4;
+                updateHighlight();
+            }
+        });
+
+        // =====================================
+        // 游戏核心逻辑
+        // =====================================
+        function loadLevel(idx) {
+            if (idx >= levels.length) {
+                alert("[ CLEAR ] 恭喜通关全 18 关！你已经是真正的 C++ 循环大师！");
+                idx = 0; currentLevelIdx = 0;
+            }
+            const lv = levels[idx];
+            
+            document.getElementById('levelTitle').textContent = lv.title;
+            document.getElementById('levelDesc').textContent = lv.desc;
+
+            // 渲染地图
+            gridEl.style.gridTemplateColumns = `repeat(${lv.cols}, var(--cell-size))`;
+            gridEl.innerHTML = '';
+            for (let y = 0; y < lv.rows; y++) {
+                for (let x = 0; x < lv.cols; x++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    if (x === lv.target.x && y === lv.target.y) cell.classList.add('target');
+                    else if (lv.traps.some(t => t.x === x && t.y === y)) cell.classList.add('trap');
+                    
+                    const coord = document.createElement('span');
+                    coord.className = 'cell-coord';
+                    coord.textContent = `${x},${y}`; 
+                    cell.appendChild(coord);
+                    gridEl.appendChild(cell);
+                }
+            }
+            gridEl.appendChild(wrapperEl); 
+
+            // UI 模式切换
+            if (lv.mode === 'guided') {
+                guidedAreaEl.style.display = 'block';
+                editorContainer.style.display = 'none';
+                
+                ['start', 'op', 'end', 'step', 'body'].forEach(k => {
+                    const idMap = {start: 'startVal', op: 'operator', end: 'endVal', step: 'stepVal', body: 'cmdBody'};
+                    const el = document.getElementById(idMap[k]);
+                    if (lv.guided[k] !== undefined) el.value = lv.guided[k];
+                    
+                    if (lv.guided.locks.includes(k)) { el.classList.add('locked-input'); el.disabled = true; } 
+                    else { el.classList.remove('locked-input'); el.disabled = false; }
+                });
+            } else {
+                guidedAreaEl.style.display = 'none';
+                editorContainer.style.display = 'block';
+                freeAreaEl.value = lv.freeCode || "";
+                updateHighlight();
+            }
+
+            resetGameUI();
+        }
+
+        // 视觉：固定身体，仅移动护目镜(Visor)
+        function updatePlayerVisuals(jump = false) {
+            const pxX = pState.x * STEP_PX; const pxY = pState.y * STEP_PX;
+            wrapperEl.style.transform = `translate(${pxX}px, ${pxY}px)`;
+            
+            let vTop = '10px', vLeft = '10px', vWidth = '10px', vHeight = '10px';
+            if (pState.dir === 0)   { vTop='10px'; vLeft='20px'; vWidth='6px'; vHeight='10px'; } // 右
+            if (pState.dir === 90)  { vTop='20px'; vLeft='10px'; vWidth='10px'; vHeight='6px'; } // 下
+            if (pState.dir === 180) { vTop='10px'; vLeft='0px';  vWidth='6px'; vHeight='10px'; } // 左
+            if (pState.dir === 270) { vTop='0px';  vLeft='10px'; vWidth='10px'; vHeight='6px'; } // 上
+
+            visorEl.style.top = vTop; visorEl.style.left = vLeft;
+            visorEl.style.width = vWidth; visorEl.style.height = vHeight;
+
+            if (jump) {
+                spriteEl.classList.remove('jumping');
+                void spriteEl.offsetWidth; 
+                spriteEl.classList.add('jumping');
+            }
+        }
+
+        function resetGameUI() {
+            const lv = levels[currentLevelIdx];
+            pState = { x: lv.start.x, y: lv.start.y, dir: lv.start.dir, logicDir: lv.start.dir };
+            
+            wrapperEl.style.transition = 'none';
+            spriteEl.className = ''; 
+            updatePlayerVisuals();
+            
+            setTimeout(() => { wrapperEl.style.transition = 'transform 0.4s ease-in-out'; }, 50);
+
+            statusEl.innerHTML = "[ SYS ] IDE 就绪，等待编译指令...";
+            statusEl.style.color = "#4ade80";
+            runBtn.style.display = 'inline-block';
+            nextBtn.style.display = 'none';
+            runBtn.disabled = false;
+        }
+
+        async function executeCommand(cmd, stepAmt = 1) {
+            if (cmd === 'turnLeft') { pState.dir = (pState.dir - 90 + 360) % 360; updatePlayerVisuals(); await sleep(400); } 
+            else if (cmd === 'turnRight') { pState.dir = (pState.dir + 90) % 360; updatePlayerVisuals(); await sleep(400); }
+            else if (cmd === 'moveForward') {
+                let steps = 1;
+                if (levels[currentLevelIdx].mode === 'guided' && levels[currentLevelIdx].rows === 1) steps = Math.abs(stepAmt);
+
+                if (pState.dir === 0) pState.x += steps;       
+                else if (pState.dir === 90) pState.y += steps; 
+                else if (pState.dir === 180) pState.x -= steps;
+                else if (pState.dir === 270) pState.y -= steps;
+
+                const isJump = steps > 1; 
+                updatePlayerVisuals(isJump); await sleep(isJump ? 500 : 400);
+            } else { failGame(`[ ERROR ] 找不到函数: ${cmd}()`); return false; }
+            return checkSafety();
+        }
+
+        function checkSafety() {
+            const lv = levels[currentLevelIdx];
+            if (pState.x < 0 || pState.x >= lv.cols || pState.y < 0 || pState.y >= lv.rows) {
+                failGame("[ FATAL ] Segment Fault: 撞墙坠落！"); return false;
+            }
+            if (lv.traps.some(t => t.x === pState.x && t.y === pState.y)) {
+                failGame("[ BURN ] 角色掉入熔岩，进程已被销毁！"); return false;
+            }
+            return true;
+        }
+
+        function failGame(msg) {
+            spriteEl.className = 'dead-anim';
+            statusEl.innerHTML = `${msg}`; statusEl.style.color = "#f56565";
+            resetBtn.disabled = false;
+        }
+
+        async function runCode() {
+            runBtn.disabled = true; resetBtn.disabled = true;
+            statusEl.innerHTML = "[ SYS ] 正在编译代码..."; await sleep(400);
+            const lv = levels[currentLevelIdx];
+
+            if (lv.mode === 'guided') {
+                let start = parseInt(document.getElementById('startVal').value);
+                let opText = document.getElementById('operator').value.trim();
+                let end = parseInt(document.getElementById('endVal').value);
+                let stepText = document.getElementById('stepVal').value.replace(/\s/g, '');
+                let bodyText = document.getElementById('cmdBody').value;
+
+                let stepAmt = 1;
+                if (stepText.includes('++')) stepAmt = 1; else if (stepText.includes('--')) stepAmt = -1;
+                else if (stepText.includes('+=')) stepAmt = parseInt(stepText.split('+=')[1]);
+                else if (stepText.includes('-=')) stepAmt = -parseInt(stepText.split('-=')[1]);
+                
+                if (isNaN(stepAmt) || stepAmt === 0) { failGame("[ COMPILE ERROR ] 步长错误"); return; }
+                if (isNaN(start) || isNaN(end) || !['<', '<=', '>', '>='].includes(opText)) { failGame("[ COMPILE ERROR ] 条件错误"); return; }
+
+                let rawLines = bodyText.split(/[\n;]/);
+                let cmds = [];
+                for (let line of rawLines) {
+                    let clean = line.trim().replace(/\s+/g, '').replace(/;/g, '').replace('()', '');
+                    if (clean && !clean.startsWith('//')) cmds.push(clean);
+                }
+
+                let i = start; let loopCount = 0;
+                const evalCond = (c, op, t) => {
+                    switch(op) { case '<': return c<t; case '<=': return c<=t; case '>': return c>t; case '>=': return c>=t; default: return false; }
+                };
+
+                while (evalCond(i, opText, end) && loopCount < 50) {
+                    statusEl.innerHTML = `[ SYS ] Loop i = ${i} ...`;
+                    for (let cmd of cmds) {
+                        let safe = await executeCommand(cmd, stepAmt);
+                        if (!safe) return; 
+                    }
+                    i += stepAmt; loopCount++;
+                }
+                if (loopCount >= 50) { failGame("[ TIMEOUT ] 死循环保护触发！"); return; }
+
+            } else if (lv.mode === 'free') {
+                let rawCode = freeAreaEl.value;
+                let jsCode = rawCode.replace(/\bint\s+/g, 'let ');
+                jsCode = jsCode.replace(/\b(moveForward|turnLeft|turnRight)\s*\(\s*\)\s*;/g, 'await _api("$1");');
+
+                const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+                try {
+                    let stepCounter = 0;
+                    const runner = new AsyncFunction('_api', jsCode);
+                    statusEl.innerHTML = `[ SYS ] 程序运行中...`;
+                    await runner(async (cmdName) => {
+                        stepCounter++;
+                        if (stepCounter > 150) throw new Error("TIMEOUT");
+                        let safe = await executeCommand(cmdName, 1);
+                        if (!safe) throw new Error("FAIL_SAFE");
+                    });
+                } catch (e) {
+                    if (e.message === "FAIL_SAFE") return;
+                    if (e.message === "TIMEOUT") { failGame("[ TIMEOUT ] 步骤过多，已强行终止！"); return; }
+                    failGame(`[ SYNTAX ERROR ] 编译失败！检查拼写或括号。<br><span style="font-size:12px">(${e.message})</span>`); 
+                    return;
+                }
+            }
+
+            await sleep(300);
+            if (pState.x === lv.target.x && pState.y === lv.target.y) {
+                spriteEl.className = 'success-anim';
+                statusEl.innerHTML = "[ PASS ] 任务完成！逻辑验证通过"; statusEl.style.color = "#ecc94b";
+                runBtn.style.display = 'none'; nextBtn.style.display = 'inline-block';
+            } else {
+                failGame("[ LOGIC ERROR ] 程序结束，未到达红旗。");
+            }
+            resetBtn.disabled = false;
+        }
+
+        runBtn.addEventListener('click', runCode);
+        resetBtn.addEventListener('click', resetGameUI);
+        nextBtn.addEventListener('click', () => { currentLevelIdx++; loadLevel(currentLevelIdx); });
+
+        loadLevel(currentLevelIdx);
+    </script>
+</body>
+</html>
