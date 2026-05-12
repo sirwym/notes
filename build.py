@@ -205,13 +205,20 @@ def scan_meta_files():
             
             meta, _ = parse_frontmatter(text)
             
-            # 推算对应的 HTML 文件路径
-            basename = os.path.basename(meta_path).replace(".meta.md", ".html")
-            href = f"{subdir}/{basename}"
+            # 推算对应的文件路径
+            if subdir == "aicourse":
+                # AI课程直接链接到PDF文件
+                basename = os.path.basename(meta_path).replace(".meta.md", ".pdf")
+                href = f"{subdir}/{basename}"
+                file_path = os.path.join(dir_path, basename)
+            else:
+                # 其他分类链接到HTML文件
+                basename = os.path.basename(meta_path).replace(".meta.md", ".html")
+                href = f"{subdir}/{basename}"
+                file_path = os.path.join(dir_path, basename)
             
-            # 检查 HTML 文件是否真实存在
-            html_path = os.path.join(dir_path, basename)
-            if not os.path.isfile(html_path):
+            # 检查文件是否真实存在
+            if not os.path.isfile(file_path):
                 print(f"  ⚠️  {basename} 不存在，跳过 {meta_path}")
                 continue
             
