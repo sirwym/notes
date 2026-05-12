@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 课程 - PDF 预览</title>
+    
+    <script src="https://cdn.jsdelivr.net/gh/sirwym/notes@main/assets/js/tailwind.js"
+            onerror="this.onerror=null;this.src='../assets/js/tailwind.js'"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'klein-blue': '#002FA7',
+                    },
+                    fontFamily: {
+                        'fun': ['"ZCOOL KuaiLe"', 'cursive', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+    
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background-color: #ffffff;
+        }
+        
+        .header-border {
+            border: 2px solid #1a1a1a;
+            box-shadow: 4px 4px 0 #1a1a1a;
+        }
+        
+        .btn-border {
+            border: 2px solid #1a1a1a;
+            box-shadow: 3px 3px 0 #1a1a1a;
+            transition: all 0.15s ease;
+        }
+        
+        .btn-border:hover {
+            transform: translate(1px, 1px);
+            box-shadow: 2px 2px 0 #1a1a1a;
+        }
+        
+        .btn-border:active {
+            transform: translate(3px, 3px);
+            box-shadow: 0 0 0 #1a1a1a;
+        }
+        
+        .pdf-container {
+            border: 2px solid #1a1a1a;
+        }
+        
+        .loading-spinner {
+            border-top-color: #002FA7;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-white">
+    <!-- Header -->
+    <header id="header" class="header-border bg-white px-4 py-4 md:px-8 md:py-6 mb-4">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <h1 id="title" class="text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 font-fun">
+                        📚 加载中...
+                    </h1>
+                    <p id="subtitle" class="text-sm md:text-base text-gray-500 mt-1">
+                        正在获取课程信息...
+                    </p>
+                </div>
+                <a href="../index.html?cat=aicourse" 
+                   class="btn-border inline-flex items-center gap-2 px-4 py-2 bg-klein-blue text-white rounded font-medium hover:bg-blue-800 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                    </svg>
+                    返回课程列表
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Loading State -->
+    <div id="loading" class="flex flex-col items-center justify-center min-h-[60vh]">
+        <div class="loading-spinner w-12 h-12 border-4 border-gray-200 rounded-full"></div>
+        <p class="mt-4 text-gray-500 font-medium">正在加载课程内容...</p>
+    </div>
+
+    <!-- PDF Container -->
+    <div id="pdfContainer" class="hidden px-4 pb-4">
+        <div class="max-w-7xl mx-auto">
+            <div class="pdf-container rounded overflow-hidden bg-gray-100">
+                <iframe 
+                    id="pdfFrame"
+                    width="100%" 
+                    height="600px"
+                    frameborder="0"
+                    class="min-h-[600px] md:min-h-[700px] lg:min-h-[800px]"
+                ></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error State -->
+    <div id="error" class="hidden flex flex-col items-center justify-center min-h-[60vh] px-4">
+        <div class="text-6xl mb-4">❌</div>
+        <h2 class="text-xl font-bold text-gray-900 mb-2">课程加载失败</h2>
+        <p id="errorMessage" class="text-gray-500 text-center">无法找到指定的课程文件</p>
+        <a href="../index.html?cat=aicourse" 
+           class="mt-6 btn-border inline-flex items-center gap-2 px-4 py-2 bg-klein-blue text-white rounded font-medium hover:bg-blue-800 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            返回课程列表
+        </a>
+    </div>
+
+    <script>
+        // 获取 URL 参数
+        function getURLParam(name) {
+            const params = new URLSearchParams(window.location.search);
+            return params.get(name);
+        }
+
+        // 解析 Markdown 元数据
+        function parseMeta(content) {
+            const meta = {};
+            if (!content.startsWith("---")) {
+                return meta;
+            }
+            const end = content.indexOf("---", 3);
+            if (end === -1) {
+                return meta;
+            }
+            const fmText = content.substring(3, end).trim();
+            fmText.split("\n").forEach(line => {
+                const colonIndex = line.indexOf(":");
+                if (colonIndex !== -1) {
+                    const key = line.substring(0, colonIndex).trim();
+                    const value = line.substring(colonIndex + 1).trim();
+                    meta[key] = value;
+                }
+            });
+            return meta;
+        }
+
+        // 加载课程
+        async function loadCourse() {
+            const name = getURLParam('name');
+            if (!name) {
+                showError('缺少课程名称参数');
+                return;
+            }
+
+            const sanitizedName = encodeURIComponent(name);
+            
+            try {
+                // 加载元数据
+                const metaResponse = await fetch(`${sanitizedName}.meta.md`);
+                if (!metaResponse.ok) {
+                    throw new Error('元数据文件不存在');
+                }
+                const metaContent = await metaResponse.text();
+                const meta = parseMeta(metaContent);
+
+                // 更新页面标题
+                document.getElementById('title').textContent = `📚 ${meta.title || name}`;
+                document.getElementById('subtitle').textContent = meta.subtitle || '';
+                document.title = `${meta.title || name} - AI 课程`;
+
+                // 设置 PDF 路径
+                const pdfPath = `${sanitizedName}.pdf`;
+                const pdfFrame = document.getElementById('pdfFrame');
+                pdfFrame.src = pdfPath;
+
+                // 切换到 PDF 视图
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('pdfContainer').style.display = 'block';
+
+                // 监听 PDF 加载错误
+                pdfFrame.onerror = function() {
+                    showError('PDF 文件加载失败，请检查文件是否存在');
+                };
+
+            } catch (error) {
+                console.error('加载课程失败:', error);
+                showError(error.message || '课程加载失败');
+            }
+        }
+
+        // 显示错误
+        function showError(message) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('pdfContainer').style.display = 'none';
+            document.getElementById('error').style.display = 'flex';
+            document.getElementById('errorMessage').textContent = message;
+        }
+
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', loadCourse);
+    </script>
+</body>
+</html>
