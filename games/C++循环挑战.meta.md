@@ -1,7 +1,7 @@
 ---
 title: C++循环挑战
 category: game
-topic: 循环
+topic: C++基础语法
 tags:
   - 循环练习
   - 迷宫
