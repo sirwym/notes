@@ -7,9 +7,8 @@ topic: GESP6
 ---
 
 ```cpp
-#include <iostream>
-#include <vector>
-#include <algorithm> // 必带：为 std::swap 提供支持
+#include <bits/stdc++.h>
+
 
 using namespace std;
 
@@ -41,7 +40,7 @@ int lca_naive(int x, int y) {
     
     // x 一步一步往上爬，直到和 y 在同一层
     while (depth[x] > depth[y]) {
-        x = fa[x];
+        x = pa[x];
     }
     
     // 如果对齐高度后，俩人已经在同一个位置了，那这就是 LCA
@@ -99,6 +98,5 @@ int main() {
 
 ### ⚠️ 常见错误
 
-* **头文件缺失报错**：忘了加 `#include <algorithm>`，导致 `std::swap` 在严格的评测机环境（如 `testlib` 评测环境下）报 Compile Error，很多人误以为是被禁用了，其实只是没加头文件。
 * **不对齐高度直接爬**：忘记第一步“深度对齐”，直接让两人一起往上走，会导致永远错过交汇点。
 * **TLE（超时）误解**：如果在洛谷模板题（数据量 $5 \times 10^5$）提交这段代码会看到满屏的 TLE（Time Limit Exceeded）。告诉自己这不是写错了，只是因为走得太慢了，需要升级成“跳远神功（倍增法）”。

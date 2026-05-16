@@ -7,9 +7,7 @@ topic: GESP6
 ---
 
 ```cpp
-#include <iostream>
-#include <vector>
-#include <algorithm> // 必带：为 std::swap 提供支持
+#include <bits/stdc++.h>
 
 using namespace std;
 
@@ -104,7 +102,6 @@ int main() {
 
 ### ⚠️ 常见错误
 
-* **头文件缺失报错**：忘记加 `#include <algorithm>`，导致 `std::swap` 或 `std::max/min` 在评测机环境下报 Compile Error（特别是 testlib 环境）。
 * **倍增数组越界**：`pa[MAXN][22]` 的第二维开得不够大，通常 $N=500000$ 时开到 20 到 22 之间即可，太小会导致越界。
 * **查询时最后一步返回错**：在齐头并进跳跃结束后，`x` 和 `y` 停在 LCA 的正下方一层，所以最后必须返回 `pa[x][0]` 而不是 `x`。
 * **位运算优先级混淆**：在写 `(1 << i) <= depth[now]` 时，忘记加括号，导致位运算和比较运算符的执行顺序出错。
