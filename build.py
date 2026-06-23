@@ -193,7 +193,7 @@ def scan_meta_files():
     """扫描 animations/ 和 games/ 下的 .meta.md 文件"""
     items = []
     
-    for subdir in ["animations", "games", "aicourse", "ai"]:
+    for subdir in ["animations", "games", "aicourse", "ai", "Demo"]:
         dir_path = os.path.join(BASE_DIR, subdir)
         if not os.path.isdir(dir_path):
             continue
@@ -245,6 +245,7 @@ def generate_card_html(item):
         "aicourse": ("tag-aicourse", "AI 课程"),
         "cpp": ("tag-cpp", "C++ 模板"),
         "ai": ("tag-ai", "AI 实验室"),
+        "demo": ("tag-demo", "Demo"),
     }
     tag_class, tag_label = tag_classes.get(category, ("tag-entry", category))
     
